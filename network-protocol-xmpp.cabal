@@ -1,5 +1,5 @@
 name: network-protocol-xmpp
-version: 0.1
+version: 0.2
 synopsis: Client <-> Server communication over XMPP
 license: GPL
 license-file: License.txt

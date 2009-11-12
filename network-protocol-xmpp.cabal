@@ -12,8 +12,8 @@ stability: experimental
 bug-reports: mailto:jmillikin@gmail.com
 
 source-repository head
-  type: bzr
-  location: bzr+ssh://bazaar.launchpad.net/~jmillikin/%2Bjunk/network-protocol-xmpp/
+  type: darcs
+  location: http://patch-tag.com/r/jmillikin/network-protocol-xmpp/pullrepo
 
 library
   build-depends: base >=3 && < 5, hxt, libxml-sax >= 0.2, hsgnutls, gsasl, network

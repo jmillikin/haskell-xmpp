@@ -17,7 +17,7 @@ source-repository head
   location: http://patch-tag.com/r/jmillikin/network-protocol-xmpp/pullrepo
 
 library
-  build-depends: base >=3 && < 5, hxt, libxml-sax >= 0.2, hsgnutls, gsasl, network
+  build-depends: base >=3 && < 5, hxt, libxml-sax >= 0.2, hsgnutls, gsasl, network, bytestring, SHA
   exposed-modules:
     Network.Protocol.XMPP
     Network.Protocol.XMPP.Client

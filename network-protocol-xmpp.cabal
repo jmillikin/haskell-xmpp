@@ -14,15 +14,20 @@ bug-reports: mailto:jmillikin@gmail.com
 
 source-repository head
   type: darcs
-  location: http://patch-tag.com/r/jmillikin/network-protocol-xmpp/pullrepo
+  location: http://ianen.org/haskell/xmpp/
 
 library
-  build-depends: base >=3 && < 5, hxt, libxml-sax >= 0.2, hsgnutls, gsasl, network, bytestring, SHA
+  build-depends:
+      base >=3 && < 5
+    , text
+    , stringprep
+    , ranges
+
   exposed-modules:
-    Network.Protocol.XMPP
-    Network.Protocol.XMPP.Client
+    -- Network.Protocol.XMPP
+    -- Network.Protocol.XMPP.Client
     Network.Protocol.XMPP.JID
-    Network.Protocol.XMPP.SASL
-    Network.Protocol.XMPP.Stanzas
-    Network.Protocol.XMPP.Stream
-    Network.Protocol.XMPP.Util
+    -- Network.Protocol.XMPP.SASL
+    -- Network.Protocol.XMPP.Stanzas
+    -- Network.Protocol.XMPP.Stream
+    -- Network.Protocol.XMPP.Util

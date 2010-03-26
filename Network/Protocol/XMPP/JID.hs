@@ -1,111 +1,120 @@
-{- Copyright (C) 2009 John Millikin <jmillikin@gmail.com>
-   
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   any later version.
-   
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-   
-   You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
--}
+-- Copyright (C) 2009 John Millikin <jmillikin@gmail.com>
+-- 
+-- This program is free software: you can redistribute it and/or modify
+-- it under the terms of the GNU General Public License as published by
+-- the Free Software Foundation, either version 3 of the License, or
+-- any later version.
+-- 
+-- This program is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+-- GNU General Public License for more details.
+-- 
+-- You should have received a copy of the GNU General Public License
+-- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-module Network.Protocol.XMPP.JID (
-	 JID(..)
-	,JIDNode
-	,JIDDomain
-	,JIDResource
+{-# LANGUAGE OverloadedStrings #-}
+module Network.Protocol.XMPP.JID
+	( JID (..)
+	, Node
+	, Domain
+	, Resource
 	
-	,jidNodeStr
-	,jidDomainStr
-	,jidResourceStr
+	, strNode
+	, strDomain
+	, strResource
 	
-	,mkJIDNode
-	,mkJIDDomain
-	,mkJIDResource
-	,mkJID
-	
-	,jidNode
-	,jidDomain
-	,jidResource
-	
-	,jidParse
-	,jidFormat
+	, parseJID
+	, formatJID
 	) where
+import qualified Data.Text as T
+import qualified Text.StringPrep as SP
+import Text.NamePrep (namePrepProfile)
+import Data.Ranges (single)
 
-data JID = JID (Maybe JIDNode) JIDDomain (Maybe JIDResource)
-	deriving (Eq, Show)
+newtype Node = Node { strNode :: T.Text }
+newtype Domain = Domain { strDomain :: T.Text }
+newtype Resource = Resource { strResource :: T.Text }
 
-newtype JIDNode = JIDNode String
-	deriving (Eq, Show)
-	
-newtype JIDDomain = JIDDomain String
-	deriving (Eq, Show)
-	
-newtype JIDResource = JIDResource String
-	deriving (Eq, Show)
+instance Show Node where
+	showsPrec d (Node x) = showParen (d > 10) $
+		showString "Node " . shows x
 
-jidNodeStr :: JIDNode -> String
-jidNodeStr (JIDNode s) = s
+instance Show Domain where
+	showsPrec d (Domain x) = showParen (d > 10) $
+		showString "Domain " . shows x
 
-jidDomainStr :: JIDDomain -> String
-jidDomainStr (JIDDomain s) = s
+instance Show Resource where
+	showsPrec d (Resource x) = showParen (d > 10) $
+		showString "Resource " . shows x
 
-jidResourceStr :: JIDResource -> String
-jidResourceStr (JIDResource s) = s
+instance Eq Node where
+	(==) = equaling (SP.runStringPrep nodePrep . strNode)
 
-mkJIDNode :: String -> Maybe JIDNode
-mkJIDNode "" = Nothing
-mkJIDNode s = Just (JIDNode s) -- TODO: stringprep, validation
+instance Eq Domain where
+	(==) = equaling (SP.runStringPrep domainPrep . strDomain)
 
-mkJIDDomain :: String -> Maybe JIDDomain
-mkJIDDomain "" = Nothing
-mkJIDDomain s = Just (JIDDomain s) -- TODO: stringprep, validation
+instance Eq Resource where
+	(==) = equaling (SP.runStringPrep resourcePrep . strResource)
 
-mkJIDResource :: String -> Maybe JIDResource
-mkJIDResource "" = Nothing
-mkJIDResource s = Just (JIDResource s) -- TODO: stringprep, validation
+data JID = JID
+	{ jidNode :: Maybe Node
+	, jidDomain :: Domain
+	, jidResource :: Maybe Resource
+	}
+	deriving (Eq)
 
-mkJID :: String -> String -> String -> Maybe JID
-mkJID nodeStr domainStr resourceStr = let
-	node = mkJIDNode nodeStr
-	resource = mkJIDResource resourceStr
-	in do
-		domain <- mkJIDDomain domainStr
-		Just (JID node domain resource)
+instance Show JID where
+	showsPrec d jid =  showParen (d > 10) $
+		showString "JID " . shows (formatJID jid)
 
-jidNode :: JID -> String
-jidNode (JID x _ _) = maybe "" jidNodeStr x
+parseJID :: T.Text -> Maybe JID
+parseJID str = maybeJID where
+	(node, postNode) = case T.spanBy (/= '@') str of
+		(x, y) -> if T.null y
+			then ("", x)
+			else (x, T.drop 1 y)
+	(domain, resource) = case T.spanBy (/= '/') postNode of
+		(x, y) -> if T.null y
+			then (x, "")
+			else (x, T.drop 1 $ y)
+	mNode = if T.null node then Nothing else Just (Node node)
+	mResource = if T.null resource then Nothing else Just (Resource resource)
+	maybeJID = do
+		SP.runStringPrep nodePrep node
+		SP.runStringPrep domainPrep domain
+		SP.runStringPrep resourcePrep resource
+		Just $ JID mNode (Domain domain) mResource
 
-jidDomain :: JID -> String
-jidDomain (JID _ x _) = jidDomainStr x
+formatJID :: JID -> T.Text
+formatJID (JID node (Domain domain) resource) = formatted where
+	formatted = T.concat [node', domain, resource']
+	node' = maybe "" (\(Node x) -> T.append x "@") node
+	resource' = maybe "" (\(Resource x) -> T.append "/" x) resource
 
-jidResource :: JID -> String
-jidResource (JID _ _ x) = maybe "" jidResourceStr x
+nodePrep :: SP.StringPrepProfile
+nodePrep = SP.Profile
+	{ SP.maps = [SP.b1, SP.b2]
+	, SP.shouldNormalize = True
+	, SP.prohibited = [ SP.c11, SP.c12, SP.c21, SP.c22
+	                  , SP.c3, SP.c4, SP.c5, SP.c6, SP.c7, SP.c8, SP.c9
+	                  , map single $ "\"&'/:<>@"
+	                  ]
+	, SP.shouldCheckBidi = True
+	}
 
--- TODO: validate input according to RFC 3920, section 3.1
-jidParse :: String -> Maybe JID
-jidParse s = let
-	(nodeStr, postNode) = if '@' `elem` s then split s '@' else ("", s)
-	(domainStr, resourceStr) = if '/' `elem` postNode then split postNode '/' else (postNode, "")
-	in mkJID nodeStr domainStr resourceStr
+domainPrep :: SP.StringPrepProfile
+domainPrep = namePrepProfile False
 
-jidFormat :: JID -> String
-jidFormat (JID node (JIDDomain domain) resource) = let
-	nodeStr = maybe "" (\(JIDNode s) -> s ++ "@") node
-	resourceStr = maybe "" (\(JIDResource s) -> "/" ++ s) resource
-	in concat [nodeStr, domain, resourceStr]
+resourcePrep :: SP.StringPrepProfile
+resourcePrep = SP.Profile
+	{ SP.maps = [SP.b1]
+	, SP.shouldNormalize = True
+	, SP.prohibited = [ SP.c12, SP.c21, SP.c22
+	                  , SP.c3, SP.c4, SP.c5, SP.c6, SP.c7, SP.c8, SP.c9]
+	, SP.shouldCheckBidi = True
+	}
 
-split :: (Eq a) => [a] -> a -> ([a], [a])
-split xs final = let
-	(before, rawAfter) = span (/= final) xs
-	after = safeTail rawAfter
-	in (before, after)
-
-safeTail :: [a] -> [a]
-safeTail [] = []
-safeTail (_:xs) = xs
+-- Similar to 'comparing'
+equaling :: Eq a => (b -> a) -> b -> b -> Bool
+equaling f x y = f x == f y

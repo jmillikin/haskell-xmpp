@@ -28,6 +28,9 @@ library
     -- Network.Protocol.XMPP.Client
     Network.Protocol.XMPP.JID
     -- Network.Protocol.XMPP.SASL
-    -- Network.Protocol.XMPP.Stanzas
+    Network.Protocol.XMPP.Stanza
     -- Network.Protocol.XMPP.Stream
     -- Network.Protocol.XMPP.Util
+
+  other-modules:
+    Network.Protocol.XMPP.Internal.Stanza

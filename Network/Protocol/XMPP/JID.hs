@@ -1,4 +1,4 @@
--- Copyright (C) 2009 John Millikin <jmillikin@gmail.com>
+-- Copyright (C) 2010 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by

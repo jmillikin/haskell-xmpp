@@ -21,12 +21,12 @@ library
 
   build-depends:
       base >=3 && < 5
-    , text
+    , text >= 0.7 && < 0.8
     , stringprep >= 0.1.2 && < 0.2
     , ranges >= 0.2.2 && < 0.3
-    , hxt
-    , hsgnutls
-    , bytestring
+    , hxt >= 8.5 && < 8.6
+    , hsgnutls >= 0.2 && < 0.3
+    , bytestring >= 0.9 && < 1.0
     , libxml-sax >= 0.3 && < 0.4
     , gsasl >= 0.2 && < 0.3
 

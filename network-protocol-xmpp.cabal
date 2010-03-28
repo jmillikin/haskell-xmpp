@@ -17,20 +17,29 @@ source-repository head
   location: http://ianen.org/haskell/xmpp/
 
 library
+  ghc-options: -Wall -fno-warn-unused-do-bind
+
   build-depends:
       base >=3 && < 5
     , text
     , stringprep
     , ranges
+    , hxt
+    , hsgnutls
+    , bytestring
+    , libxml-sax
+    , gsasl
 
   exposed-modules:
-    -- Network.Protocol.XMPP
+    Network.Protocol.XMPP
     -- Network.Protocol.XMPP.Client
     Network.Protocol.XMPP.JID
-    -- Network.Protocol.XMPP.SASL
     Network.Protocol.XMPP.Stanza
-    -- Network.Protocol.XMPP.Stream
-    -- Network.Protocol.XMPP.Util
+    Network.Protocol.XMPP.Stream
 
   other-modules:
+    Network.Protocol.XMPP.Internal.Authentication
+    Network.Protocol.XMPP.Internal.Handle
     Network.Protocol.XMPP.Internal.Stanza
+    Network.Protocol.XMPP.Internal.Stream
+    Network.Protocol.XMPP.Internal.XML

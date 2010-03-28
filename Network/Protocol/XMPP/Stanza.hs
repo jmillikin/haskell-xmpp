@@ -14,7 +14,14 @@
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 module Network.Protocol.XMPP.Stanza
-	( Stanza (stanzaTo, stanzaFrom, stanzaID, stanzaLang, stanzaPayloads)
+	( Stanza
+	  ( stanzaTo
+	  , stanzaFrom
+	  , stanzaID
+	  , stanzaLang
+	  , stanzaPayloads
+	  )
+	
 	, ReceivedStanza (..)
 	, Message (..)
 	, Presence (..)

@@ -24,7 +24,7 @@ class Stanza a where
 	stanzaID       :: a -> Maybe T.Text
 	stanzaLang     :: a -> Maybe T.Text
 	stanzaPayloads :: a -> [XmlTree]
-	stanzaTree     :: a -> XmlTree
+	stanzaToTree   :: a -> XmlTree
 
 data ReceivedStanza
 	= ReceivedMessage Message
@@ -46,7 +46,7 @@ instance Stanza Message where
 	stanzaID = messageID
 	stanzaLang = messageLang
 	stanzaPayloads = messagePayloads
-	stanzaTree = undefined
+	stanzaToTree = undefined
 
 data MessageType
 	= MessageNormal
@@ -71,7 +71,7 @@ instance Stanza Presence where
 	stanzaID = presenceID
 	stanzaLang = presenceLang
 	stanzaPayloads = presencePayloads
-	stanzaTree = undefined
+	stanzaToTree = undefined
 
 data PresenceType
 	= PresenceUnavailable
@@ -98,7 +98,7 @@ instance Stanza IQ where
 	stanzaID = iqID
 	stanzaLang = iqLang
 	stanzaPayloads iq = [iqPayload iq]
-	stanzaTree = undefined
+	stanzaToTree = undefined
 
 data IQType
 	= IQGet
@@ -106,3 +106,6 @@ data IQType
 	| IQResult
 	| IQError
 	deriving (Show, Eq)
+
+treeToStanza :: XmlTree -> Maybe ReceivedStanza
+treeToStanza = undefined

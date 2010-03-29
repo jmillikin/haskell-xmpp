@@ -14,9 +14,13 @@
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 module Network.Protocol.XMPP.Internal.Stanza where
-import Network.Protocol.XMPP.JID (JID)
 import qualified Data.Text as T
 import Text.XML.HXT.DOM.Interface (XmlTree)
+import Text.XML.HXT.Arrow ((>>>))
+import qualified Text.XML.HXT.Arrow as A
+
+import Network.Protocol.XMPP.Internal.XML (element)
+import Network.Protocol.XMPP.JID (JID, parseJID, formatJID)
 
 class Stanza a where
 	stanzaTo       :: a -> Maybe JID
@@ -46,11 +50,17 @@ instance Stanza Message where
 	stanzaID = messageID
 	stanzaLang = messageLang
 	stanzaPayloads = messagePayloads
-	stanzaToTree = undefined
+	stanzaToTree x = stanzaToTree' x "message" typeStr where
+		typeStr = case messageType x of
+			MessageNormal -> "normal"
+			MessageChat -> "chat"
+			MessageGroupChat -> "groupchat"
+			MessageHeadline -> "headline"
+			MessageError -> "error"
 
 data MessageType
 	= MessageNormal
-	| MessageCHat
+	| MessageChat
 	| MessageGroupChat
 	| MessageHeadline
 	| MessageError
@@ -81,7 +91,16 @@ instance Stanza Presence where
 	stanzaID = presenceID
 	stanzaLang = presenceLang
 	stanzaPayloads = presencePayloads
-	stanzaToTree = undefined
+	stanzaToTree x = stanzaToTree' x "presence" typeStr where
+		typeStr = case presenceType x of
+			PresenceAvailable -> ""
+			PresenceUnavailable -> "unavailable"
+			PresenceSubscribe -> "subscribe"
+			PresenceSubscribed -> "subscribed"
+			PresenceUnsubscribe -> "unsubscribe"
+			PresenceUnsubscribed -> "unsubscribed"
+			PresenceProbe -> "probe"
+			PresenceError -> "error"
 
 data PresenceType
 	= PresenceAvailable
@@ -119,7 +138,12 @@ instance Stanza IQ where
 	stanzaID = iqID
 	stanzaLang = iqLang
 	stanzaPayloads iq = [iqPayload iq]
-	stanzaToTree = undefined
+	stanzaToTree x = stanzaToTree' x "iq" typeStr where
+		typeStr = case iqType x of
+			IQGet -> "get"
+			IQSet -> "set"
+			IQResult -> "result"
+			IQError -> "error"
 
 data IQType
 	= IQGet
@@ -138,5 +162,94 @@ emptyIQ t tree = IQ
 	, iqPayload = tree
 	}
 
-treeToStanza :: XmlTree -> Maybe ReceivedStanza
-treeToStanza = undefined
+stanzaToTree' :: Stanza a => a -> String -> String -> XmlTree
+stanzaToTree' stanza name typeStr = element ("", name) attrs payloads where
+	payloads = stanzaPayloads stanza
+	attrs = concat
+		[ mattr "to" $ fmap formatJID . stanzaTo
+		, mattr "from" $ fmap formatJID . stanzaFrom
+		, mattr "id" stanzaID
+		, mattr "xml:lang" stanzaLang
+		, if null typeStr then [] else [("", "type", typeStr)]
+		]
+	mattr label f = case f stanza of
+		Nothing -> []
+		Just text -> [("", label, T.unpack text)]
+
+treeToStanza :: T.Text -> XmlTree -> Maybe ReceivedStanza
+treeToStanza ns tree = do
+	treeNS <- runMA A.getNamespaceUri tree
+	if T.pack treeNS == ns then Just () else Nothing
+	
+	treeName <- runMA A.getLocalPart tree
+	case treeName of
+		"message" -> ReceivedMessage `fmap` parseMessage tree
+		"presence" -> ReceivedPresence `fmap` parsePresence tree
+		"iq" -> ReceivedIQ `fmap` parseIQ tree
+		_ -> Nothing
+
+parseMessage :: XmlTree -> Maybe Message
+parseMessage t = do
+	typeStr <- runMA (A.getAttrValue "type") t
+	msgType <- case typeStr of
+		"normal"    -> Just MessageNormal
+		"chat"      -> Just MessageChat
+		"groupchat" -> Just MessageGroupChat
+		"headline"  -> Just MessageHeadline
+		"error"     -> Just MessageError
+		_           -> Nothing
+	msgTo <- xmlJID "to" t
+	msgFrom <- xmlJID "from" t
+	let msgID = T.pack `fmap` runMA (A.getAttrValue "id") t
+	let msgLang = T.pack `fmap` runMA (A.getAttrValue "lang") t
+	let payloads = A.runLA (A.getChildren >>> A.isElem) t
+	return $ Message msgType msgTo msgFrom msgID msgLang payloads
+
+parsePresence :: XmlTree -> Maybe Presence
+parsePresence t = do
+	let typeStr = maybe "" id $ runMA (A.getAttrValue "type") t
+	pType <- case typeStr of
+		""             -> Just PresenceAvailable
+		"unavailable"  -> Just PresenceUnavailable
+		"subscribe"    -> Just PresenceSubscribe
+		"subscribed"   -> Just PresenceSubscribed
+		"unsubscribe"  -> Just PresenceUnsubscribe
+		"unsubscribed" -> Just PresenceUnsubscribed
+		"probe"        -> Just PresenceProbe
+		"error"        -> Just PresenceError
+		_              -> Nothing
+		
+	msgTo <- xmlJID "to" t
+	msgFrom <- xmlJID "from" t
+	let msgID = T.pack `fmap` runMA (A.getAttrValue "id") t
+	let msgLang = T.pack `fmap` runMA (A.getAttrValue "lang") t
+	let payloads = A.runLA (A.getChildren >>> A.isElem) t
+	return $ Presence pType msgTo msgFrom msgID msgLang payloads
+
+parseIQ :: XmlTree -> Maybe IQ
+parseIQ t = do
+	typeStr <- runMA (A.getAttrValue "type") t
+	iqType <- case typeStr of
+		"get"    -> Just IQGet
+		"set"    -> Just IQSet
+		"result" -> Just IQResult
+		"error"  -> Just IQError
+		_        -> Nothing
+	msgTo <- xmlJID "to" t
+	msgFrom <- xmlJID "from" t
+	let msgID = T.pack `fmap` runMA (A.getAttrValue "id") t
+	let msgLang = T.pack `fmap` runMA (A.getAttrValue "lang") t
+	payload <- runMA (A.getChildren >>> A.isElem) t
+	return $ IQ iqType msgTo msgFrom msgID msgLang payload
+
+xmlJID :: String -> XmlTree -> Maybe (Maybe JID)
+xmlJID attr t = case runMA (A.getAttrValue attr) t of
+	Nothing -> Just Nothing
+	Just raw -> case parseJID (T.pack raw) of
+		Just jid -> Just (Just jid)
+		Nothing -> Nothing
+
+runMA :: A.LA a b -> a -> Maybe b
+runMA arr x = case A.runLA arr x of
+	[] -> Nothing
+	(y:_) -> Just y

@@ -53,6 +53,7 @@ data Component = Component
 	}
 
 instance S.Stream Component where
+	streamNamespace _ = "jabber:component:accept"
 	getTree s = getTree (componentHandle s) (componentParser s)
 	putTree s = putTree (componentHandle s)
 

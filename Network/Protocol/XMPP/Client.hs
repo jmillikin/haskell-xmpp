@@ -55,10 +55,12 @@ data ClientStream = ClientStream
 	}
 
 instance S.Stream Client where
+	streamNamespace _ = "jabber:client"
 	getTree = S.getTree . clientStream
 	putTree = S.putTree . clientStream
 
 instance S.Stream ClientStream where
+	streamNamespace _ = "jabber:client"
 	getTree s = getTree (streamHandle s) (streamParser s)
 	putTree s = putTree (streamHandle s)
 

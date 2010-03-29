@@ -16,8 +16,10 @@
 module Network.Protocol.XMPP.Internal.Stream
 	( Stream (..)
 	) where
+import qualified Data.Text as T
 import Text.XML.HXT.DOM.Interface (XmlTree)
 
 class Stream a where
+	streamNamespace :: a -> T.Text
 	putTree :: a -> XmlTree -> IO ()
 	getTree :: a -> IO XmlTree

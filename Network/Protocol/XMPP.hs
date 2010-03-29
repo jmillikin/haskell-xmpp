@@ -15,11 +15,19 @@
 
 
 module Network.Protocol.XMPP
-	( module Network.Protocol.XMPP.JID
+	( module Network.Protocol.XMPP.Client
+	, module Network.Protocol.XMPP.Component
+	, module Network.Protocol.XMPP.JID
 	, module Network.Protocol.XMPP.Stanza
 	, module Network.Protocol.XMPP.Stream
+	, Server (..)
 	) where
 
+import Network.Protocol.XMPP.Client
+import Network.Protocol.XMPP.Component
 import Network.Protocol.XMPP.JID
 import Network.Protocol.XMPP.Stanza
 import Network.Protocol.XMPP.Stream
+
+
+import Network.Protocol.XMPP.Internal.Connections

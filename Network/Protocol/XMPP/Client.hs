@@ -16,42 +16,34 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.Client
 	( Client
-	, Server (..)
+	, clientJID
 	, connectClient
 	, bindClient
 	) where
-import Network (HostName, PortID, connectTo)
+import Network (connectTo)
 import Text.XML.HXT.Arrow ((>>>))
 import qualified Text.XML.HXT.Arrow as A
 import qualified Text.XML.HXT.DOM.Interface as DOM
 import qualified Text.XML.HXT.DOM.XmlNode as XN
 import qualified System.IO as IO
-import qualified Data.ByteString as B
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
 import qualified Text.XML.LibXML.SAX as SAX
 
 import qualified Network.Protocol.XMPP.Internal.Authentication as A
+import qualified Network.Protocol.XMPP.Internal.Connections as C
 import qualified Network.Protocol.XMPP.Internal.Features as F
 import qualified Network.Protocol.XMPP.Internal.Handle as H
 import qualified Network.Protocol.XMPP.Internal.Stream as S
 import qualified Network.Protocol.XMPP.Stream as S
 import Network.Protocol.XMPP.Internal.XML ( getTree, putTree
-                                          , element, qname
-                                          , readEventsUntil, convertQName
-                                          )
+                                                 , element, qname
+                                                 , readEventsUntil
+                                                 )
 import qualified Network.Protocol.XMPP.JID as J
 import Network.Protocol.XMPP.Stanza
 
-data Server = Server
-	{ serverJID      :: J.JID
-	, serverHostname :: HostName
-	, serverPort     :: PortID
-	}
-
 data Client = Client
 	{ clientJID    :: J.JID
-	, clientServer :: Server
 	, clientStream :: ClientStream
 	}
 
@@ -70,18 +62,22 @@ instance S.Stream ClientStream where
 	getTree s = getTree (streamHandle s) (streamParser s)
 	putTree s = putTree (streamHandle s)
 
-connectClient :: Server -> J.JID -> T.Text -> T.Text -> IO Client
+connectClient :: C.Server
+              -> J.JID -- ^ Client JID
+              -> T.Text -- ^ Username
+              -> T.Text -- ^ Password
+              -> IO Client
 connectClient server jid username password = do
 	-- Open a TCP connection
-	let Server sjid host port = server
+	let C.Server sjid host port = server
 	rawHandle <- connectTo host port
 	IO.hSetBuffering rawHandle IO.NoBuffering
 	let handle = H.PlainHandle rawHandle
 	
 	-- Open the initial stream and authenticate
-	stream <- beginClientStream server handle
+	stream <- beginStream sjid handle
 	authedStream <- authenticate stream jid sjid username password
-	return $ Client jid server authedStream
+	return $ Client jid authedStream
 
 authenticate :: ClientStream -> J.JID -> J.JID -> T.Text -> T.Text -> IO ClientStream
 authenticate stream jid sjid username password = do
@@ -148,9 +144,8 @@ sessionStanza = emptyIQ IQSet $ element ("", "session")
 	[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-session")]
 	[]
 
-beginClientStream :: Server -> H.Handle -> IO ClientStream
-beginClientStream server handle = do
-	let jid = serverJID server
+beginStream :: J.JID -> H.Handle -> IO ClientStream
+beginStream jid handle = do
 	plain <- newStream jid handle
 	if streamSupportsTLS plain
 		then do
@@ -164,14 +159,9 @@ restartStream s = newStream (streamJID s) (streamHandle s)
 
 newStream :: J.JID -> H.Handle -> IO ClientStream
 newStream jid h = do
-	let startOfStream depth event = case (depth, event) of
-		(1, (SAX.BeginElement elemName _)) ->
-			qnameStream == convertQName elemName
-		_ -> False
-	
 	parser <- SAX.mkParser
-	H.hPutBytes h $ xmlHeader "jabber:client" jid
-	readEventsUntil startOfStream h parser
+	H.hPutBytes h $ C.xmlHeader "jabber:client" jid
+	readEventsUntil C.startOfStream h parser
 	features <- F.parseFeatures `fmap` getTree h parser
 	
 	return $ ClientStream jid h features parser
@@ -185,21 +175,3 @@ xmlStartTLS :: DOM.XmlTree
 xmlStartTLS = element ("", "starttls")
 	[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-tls")]
 	[]
-
--- Since only the opening tag should be written, normal XML
--- serialization cannot be used. Be careful to escape any embedded
--- attributes.
-xmlHeader :: T.Text -> J.JID -> B.ByteString
-xmlHeader ns jid = TE.encodeUtf8 header where
-	escape = T.pack . DOM.attrEscapeXml . T.unpack -- TODO: optimize?
-	attr x = T.concat ["\"", escape x, "\""]
-	header = T.concat
-		[ "<?xml version='1.0'?>\n"
-		, "<stream:stream xmlns=" , attr ns
-		, " to=", attr (J.formatJID jid)
-		, " version=\"1.0\""
-		, " xmlns:stream=\"http://etherx.jabber.org/streams\">"
-		]
-
-qnameStream :: DOM.QName
-qnameStream = qname "http://etherx.jabber.org/streams" "stream"

@@ -25,7 +25,7 @@ import qualified Text.XML.HXT.DOM.XmlNode as XN
 import qualified Network.Protocol.SASL.GSASL as G
 
 import Network.Protocol.XMPP.JID (JID, formatJID)
-import Network.Protocol.XMPP.Internal.XML (mkElement, mkQName)
+import Network.Protocol.XMPP.Internal.XML (element, qname)
 import qualified Network.Protocol.XMPP.Internal.Stream as S
 
 data Result = Success | Failure
@@ -58,7 +58,7 @@ authenticate stream mechanisms userJID serverJID username password = do
 	G.propertySet s G.GSASL_HOSTNAME $ T.unpack hostname
 	
 	(b64text, rc) <- G.step64 s ""
-	S.putTree stream $ mkElement ("", "auth")
+	S.putTree stream $ element ("", "auth")
 		[ ("", "xmlns", "urn:ietf:params:xml:ns:xmpp-sasl")
 		 ,("", "mechanism", mechanism)]
 		[XN.mkText b64text]
@@ -73,13 +73,13 @@ saslLoop stream session = do
 	challengeText <- A.runX (
 		A.arrIO (\_ -> S.getTree stream)
 		>>> A.getChildren
-		>>> A.hasQName (mkQName "urn:ietf:params:xml:ns:xmpp-sasl" "challenge")
+		>>> A.hasQName (qname "urn:ietf:params:xml:ns:xmpp-sasl" "challenge")
 		>>> A.getChildren >>> A.getText)
 	
 	if null challengeText then return Failure
 		else do
 			(b64text, rc) <- G.step64 session (concat challengeText)
-			S.putTree stream $ mkElement ("", "response")
+			S.putTree stream $ element ("", "response")
 				[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-sasl")]
 				[XN.mkText b64text]
 			case rc of
@@ -92,6 +92,6 @@ saslFinish stream = do
 	successElem <- A.runX (
 		A.arrIO (\_ -> S.getTree stream)
 		>>> A.getChildren
-		>>> A.hasQName (mkQName "urn:ietf:params:xml:ns:xmpp-sasl" "success"))
+		>>> A.hasQName (qname "urn:ietf:params:xml:ns:xmpp-sasl" "success"))
 	
 	return $ if null successElem then Failure else Success

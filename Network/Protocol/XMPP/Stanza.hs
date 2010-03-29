@@ -29,5 +29,9 @@ module Network.Protocol.XMPP.Stanza
 	, MessageType (..)
 	, PresenceType (..)
 	, IQType (..)
+	
+	, emptyMessage
+	, emptyPresence
+	, emptyIQ
 	) where
 import Network.Protocol.XMPP.Internal.Stanza

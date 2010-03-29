@@ -56,6 +56,16 @@ data MessageType
 	| MessageError
 	deriving (Show, Eq)
 
+emptyMessage :: MessageType -> Message
+emptyMessage t = Message
+	{ messageType = t
+	, messageTo = Nothing
+	, messageFrom = Nothing
+	, messageID = Nothing
+	, messageLang = Nothing
+	, messagePayloads = []
+	}
+
 data Presence = Presence
 	{ presenceType     :: PresenceType
 	, presenceTo       :: Maybe JID
@@ -74,7 +84,8 @@ instance Stanza Presence where
 	stanzaToTree = undefined
 
 data PresenceType
-	= PresenceUnavailable
+	= PresenceAvailable
+	| PresenceUnavailable
 	| PresenceSubscribe
 	| PresenceSubscribed
 	| PresenceUnsubscribe
@@ -82,6 +93,16 @@ data PresenceType
 	| PresenceProbe
 	| PresenceError
 	deriving (Show, Eq)
+
+emptyPresence :: PresenceType -> Presence
+emptyPresence t = Presence
+	{ presenceType = t
+	, presenceTo = Nothing
+	, presenceFrom = Nothing
+	, presenceID = Nothing
+	, presenceLang = Nothing
+	, presencePayloads = []
+	}
 
 data IQ = IQ
 	{ iqType    :: IQType
@@ -106,6 +127,16 @@ data IQType
 	| IQResult
 	| IQError
 	deriving (Show, Eq)
+
+emptyIQ :: IQType -> XmlTree -> IQ
+emptyIQ t tree = IQ
+	{ iqType = t
+	, iqTo = Nothing
+	, iqFrom = Nothing
+	, iqID = Nothing
+	, iqLang = Nothing
+	, iqPayload = tree
+	}
 
 treeToStanza :: XmlTree -> Maybe ReceivedStanza
 treeToStanza = undefined

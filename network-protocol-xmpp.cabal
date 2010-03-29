@@ -29,16 +29,18 @@ library
     , bytestring >= 0.9 && < 1.0
     , libxml-sax >= 0.3 && < 0.4
     , gsasl >= 0.2 && < 0.3
+    , network >= 2.2 && < 2.3
 
   exposed-modules:
     Network.Protocol.XMPP
-    -- Network.Protocol.XMPP.Client
+    Network.Protocol.XMPP.Client
     Network.Protocol.XMPP.JID
     Network.Protocol.XMPP.Stanza
     Network.Protocol.XMPP.Stream
 
   other-modules:
     Network.Protocol.XMPP.Internal.Authentication
+    Network.Protocol.XMPP.Internal.Features
     Network.Protocol.XMPP.Internal.Handle
     Network.Protocol.XMPP.Internal.Stanza
     Network.Protocol.XMPP.Internal.Stream

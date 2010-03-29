@@ -25,4 +25,4 @@ putStanza :: (Stream stream, Stanza stanza) => stream -> stanza -> IO ()
 putStanza stream = putTree stream . stanzaToTree
 
 getStanza :: Stream stream => stream -> IO (Maybe ReceivedStanza)
-getStanza stream = treeToStanza `fmap` getTree stream
+getStanza stream = treeToStanza (streamNamespace stream) `fmap` getTree stream

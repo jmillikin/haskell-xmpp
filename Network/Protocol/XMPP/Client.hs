@@ -97,8 +97,6 @@ authenticationMechanisms = step . streamFeatures where
 		(F.FeatureSASL ms) -> ms
 		_ -> step fs
 
--- TODO: does it make sense to put this in 'connect'?
--- Can multiple resources be bound to one client?
 bindClient :: Client -> IO J.JID
 bindClient c = do
 	-- Bind
@@ -152,7 +150,7 @@ beginStream jid handle = do
 	if streamSupportsTLS plain
 		then do
 			S.putTree plain xmlStartTLS
-			S.getTree plain -- TODO: verify
+			S.getTree plain
 			H.startTLS handle >>= newStream jid
 		else return plain
 

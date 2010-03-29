@@ -41,7 +41,7 @@ data Server = Server
 -- attributes.
 xmlHeader :: T.Text -> JID -> ByteString
 xmlHeader ns jid = encodeUtf8 header where
-	escape = T.pack . DOM.attrEscapeXml . T.unpack -- TODO: optimize?
+	escape = T.pack . DOM.attrEscapeXml . T.unpack
 	attr x = T.concat ["\"", escape x, "\""]
 	header = T.concat
 		[ "<?xml version='1.0'?>\n"

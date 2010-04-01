@@ -18,7 +18,7 @@ module Network.Protocol.XMPP.Internal.Features
 	, parseFeatures
 	, parseFeature
 	) where
-import qualified Data.Text as T
+import qualified Data.ByteString.Char8 as B
 import Text.XML.HXT.Arrow ((>>>))
 import qualified Text.XML.HXT.Arrow as A
 import qualified Text.XML.HXT.DOM.Interface as DOM
@@ -27,7 +27,7 @@ import Network.Protocol.XMPP.Internal.XML (qname)
 
 data Feature =
 	  FeatureStartTLS Bool
-	| FeatureSASL [T.Text]
+	| FeatureSASL [B.ByteString]
 	| FeatureRegister
 	| FeatureBind
 	| FeatureSession
@@ -56,13 +56,12 @@ parseFeatureTLS :: DOM.XmlTree -> Feature
 parseFeatureTLS t = FeatureStartTLS True -- TODO: detect whether or not required
 
 parseFeatureSASL :: DOM.XmlTree -> Feature
-parseFeatureSASL t = FeatureSASL $ map T.toUpper mechanisms where
-	mechanisms = A.runLA (
-		A.getChildren
-		>>> A.hasQName qnameMechanism
-		>>> A.getChildren
-		>>> A.getText
-		>>> A.arr T.pack) t
+parseFeatureSASL t = FeatureSASL $ A.runLA (
+	A.getChildren
+	>>> A.hasQName qnameMechanism
+	>>> A.getChildren
+	>>> A.getText
+	>>> A.arr B.pack) t
 
 qnameMechanism :: DOM.QName
 qnameMechanism = qname "urn:ietf:params:xml:ns:xmpp-sasl" "mechanism"

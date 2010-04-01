@@ -26,6 +26,7 @@ import qualified Text.XML.HXT.Arrow as A
 import qualified Text.XML.HXT.DOM.Interface as DOM
 import qualified Text.XML.HXT.DOM.XmlNode as XN
 import qualified System.IO as IO
+import Data.ByteString (ByteString)
 import qualified Data.Text as T
 import qualified Text.XML.LibXML.SAX as SAX
 
@@ -90,7 +91,7 @@ authenticate stream jid sjid username password = do
 		A.Failure -> error "Authentication failure"
 		_ -> restartStream stream
 
-authenticationMechanisms :: ClientStream -> [T.Text]
+authenticationMechanisms :: ClientStream -> [ByteString]
 authenticationMechanisms = step . streamFeatures where
 	step [] = []
 	step (f:fs) = case f of

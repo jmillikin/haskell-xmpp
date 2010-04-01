@@ -17,12 +17,15 @@ module Network.Protocol.XMPP.Internal.Authentication
 	( Result(..)
 	, authenticate
 	) where
+import Control.Monad.IO.Class (liftIO)
+import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 
 import Text.XML.HXT.Arrow ((>>>))
 import qualified Text.XML.HXT.Arrow as A
 import qualified Text.XML.HXT.DOM.XmlNode as XN
-import qualified Network.Protocol.SASL.GSASL as G
+import qualified Network.Protocol.SASL.GNU as SASL
 
 import Network.Protocol.XMPP.JID (JID, formatJID)
 import Network.Protocol.XMPP.Internal.XML (element, qname)
@@ -32,7 +35,7 @@ data Result = Success | Failure
 	deriving (Show, Eq)
 
 authenticate :: S.Stream stream => stream
-             -> [T.Text] -- ^ Mechanisms
+             -> [B.ByteString] -- ^ Mechanisms
              -> JID -- ^ User JID
              -> JID -- ^ Server JID
              -> T.Text -- ^ Username
@@ -41,51 +44,49 @@ authenticate :: S.Stream stream => stream
 authenticate stream mechanisms userJID serverJID username password = do
 	let authz = formatJID userJID
 	let hostname = formatJID serverJID
+	let utf8 = TE.encodeUtf8
 	
-	G.withContext $ \ctxt -> do
-	
-	suggested <- G.clientSuggestMechanism ctxt (map T.unpack mechanisms)
-	mechanism <- case suggested of
-		Just m -> return m
-		Nothing -> error "No supported SASL mechanisms advertised"
-	
-	G.withSession (G.clientStart ctxt mechanism) $ \s -> do
-	
-	G.propertySet s G.GSASL_AUTHZID $ T.unpack authz
-	G.propertySet s G.GSASL_AUTHID $ T.unpack username
-	G.propertySet s G.GSASL_PASSWORD $ T.unpack password
-	G.propertySet s G.GSASL_SERVICE "xmpp"
-	G.propertySet s G.GSASL_HOSTNAME $ T.unpack hostname
-	
-	(b64text, rc) <- G.step64 s ""
-	S.putTree stream $ element ("", "auth")
-		[ ("", "xmlns", "urn:ietf:params:xml:ns:xmpp-sasl")
-		 ,("", "mechanism", mechanism)]
-		[XN.mkText b64text]
-	
-	case rc of
-		G.GSASL_OK -> saslFinish stream
-		G.GSASL_NEEDS_MORE -> saslLoop stream s
-		_ -> error "Unknown GNU SASL response"
+	SASL.runSASL $ do
+		suggested <- SASL.clientSuggestMechanism $ map SASL.Mechanism mechanisms
+		mechanism <- case suggested of
+			Just m -> return m
+			Nothing -> error "No supported SASL mechanisms advertised"
+		let (SASL.Mechanism mechBytes) = mechanism
+		SASL.runClient mechanism $ do
+			SASL.setProperty SASL.PropertyAuthzID $ utf8 authz
+			SASL.setProperty SASL.PropertyAuthID $ utf8 username
+			SASL.setProperty SASL.PropertyPassword $ utf8 password
+			SASL.setProperty SASL.PropertyService $ B.pack "xmpp"
+			SASL.setProperty SASL.PropertyHostname $ utf8 hostname
+			
+			(b64text, rc) <- SASL.step64 $ B.pack ""
+			liftIO $ S.putTree stream $ element ("", "auth")
+				[ ("", "xmlns", "urn:ietf:params:xml:ns:xmpp-sasl")
+				, ("", "mechanism", B.unpack mechBytes)]
+				[XN.mkText $ B.unpack b64text]
+			
+			case rc of
+				SASL.Complete -> liftIO $ saslFinish stream
+				SASL.NeedsMore -> saslLoop stream
 
-saslLoop :: S.Stream s => s -> G.Session -> IO Result
-saslLoop stream session = do
-	challengeText <- A.runX (
+saslLoop :: S.Stream s => s -> SASL.Session Result
+saslLoop stream = do
+	challengeText <- liftIO $ A.runX (
 		A.arrIO (\_ -> S.getTree stream)
 		>>> A.getChildren
 		>>> A.hasQName (qname "urn:ietf:params:xml:ns:xmpp-sasl" "challenge")
 		>>> A.getChildren >>> A.getText)
 	
-	if null challengeText then return Failure
+	if null challengeText
+		then return Failure
 		else do
-			(b64text, rc) <- G.step64 session (concat challengeText)
-			S.putTree stream $ element ("", "response")
+			(b64text, rc) <- SASL.step64 $ B.pack $ concat challengeText
+			liftIO $ S.putTree stream $ element ("", "response")
 				[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-sasl")]
-				[XN.mkText b64text]
+				[XN.mkText $ B.unpack b64text]
 			case rc of
-				G.GSASL_OK -> saslFinish stream
-				G.GSASL_NEEDS_MORE -> saslLoop stream session
-				_ -> error "Unknown GNU SASL response"
+				SASL.Complete -> liftIO $ saslFinish stream
+				SASL.NeedsMore -> saslLoop stream
 
 saslFinish :: S.Stream s => s -> IO Result
 saslFinish stream = do

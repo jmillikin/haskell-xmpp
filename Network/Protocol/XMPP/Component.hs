@@ -21,18 +21,18 @@ module Network.Protocol.XMPP.Component
 	, componentStreamID
 	, connectComponent
 	) where
-
+import Data.Bits (shiftR, (.&.))
+import Data.Char (intToDigit)
+import qualified Data.ByteString as B
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import Network (connectTo)
 import Text.XML.HXT.Arrow ((>>>))
 import qualified Text.XML.HXT.Arrow as A
 import qualified Text.XML.HXT.DOM.Interface as DOM
 import qualified Text.XML.HXT.DOM.XmlNode as XN
-import qualified Data.Digest.Pure.SHA as SHA
+import Network.Protocol.SASL.GNU (sha1)
 import qualified System.IO as IO
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
 import qualified Text.XML.LibXML.SAX as SAX
 
 import qualified Network.Protocol.XMPP.Internal.Connections as C
@@ -95,7 +95,7 @@ parseStreamID _ = Nothing
 authenticate :: Component -> T.Text -> IO ()
 authenticate stream password = do
 	let bytes = buildSecret (componentStreamID stream) password
-	let digest = SHA.showDigest $ SHA.sha1 $ BL.fromChunks [bytes]
+	let digest = showDigest $ sha1 bytes
 	S.putTree stream $ element ("", "handshake") [] [XN.mkText digest]
 	result <- S.getTree stream
 	let accepted = A.runLA $
@@ -111,3 +111,8 @@ buildSecret sid password = bytes where
 	escaped = DOM.attrEscapeXml $ sid' ++ password'
 	sid' = T.unpack sid
 	password' = T.unpack password
+
+showDigest :: B.ByteString -> String
+showDigest = concatMap wordToHex . B.unpack where
+	wordToHex x = [hexDig $ shiftR x 4, hexDig $ x .&. 0xF]
+	hexDig = intToDigit . fromIntegral

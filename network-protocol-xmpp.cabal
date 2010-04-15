@@ -34,17 +34,15 @@ library
 
   exposed-modules:
     Network.Protocol.XMPP
+
+  other-modules:
+    Network.Protocol.XMPP.Authentication
     Network.Protocol.XMPP.Client
     Network.Protocol.XMPP.Component
+    Network.Protocol.XMPP.Connections
+    Network.Protocol.XMPP.Features
+    Network.Protocol.XMPP.Handle
     Network.Protocol.XMPP.JID
     Network.Protocol.XMPP.Stanza
     Network.Protocol.XMPP.Stream
-
-  other-modules:
-    Network.Protocol.XMPP.Internal.Authentication
-    Network.Protocol.XMPP.Internal.Connections
-    Network.Protocol.XMPP.Internal.Features
-    Network.Protocol.XMPP.Internal.Handle
-    Network.Protocol.XMPP.Internal.Stanza
-    Network.Protocol.XMPP.Internal.Stream
-    Network.Protocol.XMPP.Internal.XML
+    Network.Protocol.XMPP.XML

@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-module Network.Protocol.XMPP.Internal.XML
+module Network.Protocol.XMPP.XML
 	( getTree
 	, putTree
 	, readEventsUntil
@@ -22,7 +22,7 @@ module Network.Protocol.XMPP.Internal.XML
 	, attr
 	, qname
 	) where
-import qualified Network.Protocol.XMPP.Internal.Handle as H
+import qualified Network.Protocol.XMPP.Handle as H
 import qualified Data.ByteString.Char8 as C8
 
 -- XML Parsing

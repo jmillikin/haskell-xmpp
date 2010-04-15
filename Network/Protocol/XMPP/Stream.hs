@@ -14,15 +14,21 @@
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 module Network.Protocol.XMPP.Stream
-	( Stream
+	( Stream (..)
 	, putStanza
 	, getStanza
 	) where
-import Network.Protocol.XMPP.Internal.Stream
-import Network.Protocol.XMPP.Internal.Stanza
+import qualified Data.Text as T
+import Text.XML.HXT.DOM.Interface (XmlTree)
+import qualified Network.Protocol.XMPP.Stanza as S
 
-putStanza :: (Stream stream, Stanza stanza) => stream -> stanza -> IO ()
-putStanza stream = putTree stream . stanzaToTree
+class Stream a where
+	streamNamespace :: a -> T.Text
+	putTree :: a -> XmlTree -> IO ()
+	getTree :: a -> IO XmlTree
 
-getStanza :: Stream stream => stream -> IO (Maybe ReceivedStanza)
-getStanza stream = treeToStanza (streamNamespace stream) `fmap` getTree stream
+putStanza :: (Stream stream, S.Stanza stanza) => stream -> stanza -> IO ()
+putStanza stream = putTree stream . S.stanzaToTree
+
+getStanza :: Stream stream => stream -> IO (Maybe S.ReceivedStanza)
+getStanza stream = S.treeToStanza (streamNamespace stream) `fmap` getTree stream

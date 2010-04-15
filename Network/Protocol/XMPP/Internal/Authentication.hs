@@ -52,7 +52,7 @@ authenticate stream mechanisms userJID serverJID username password = do
 			Just m -> return m
 			Nothing -> error "No supported SASL mechanisms advertised"
 		let (SASL.Mechanism mechBytes) = mechanism
-		SASL.runClient mechanism $ do
+		result <- SASL.runClient mechanism $ do
 			SASL.setProperty SASL.PropertyAuthzID $ utf8 authz
 			SASL.setProperty SASL.PropertyAuthID $ utf8 username
 			SASL.setProperty SASL.PropertyPassword $ utf8 password
@@ -68,6 +68,9 @@ authenticate stream mechanisms userJID serverJID username password = do
 			case rc of
 				SASL.Complete -> liftIO $ saslFinish stream
 				SASL.NeedsMore -> saslLoop stream
+		case result of
+			Right x -> return x
+			Left err -> error $ show err
 
 saslLoop :: S.Stream s => s -> SASL.Session Result
 saslLoop stream = do

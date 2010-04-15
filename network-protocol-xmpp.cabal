@@ -36,11 +36,11 @@ library
     Network.Protocol.XMPP
 
   other-modules:
-    Network.Protocol.XMPP.Authentication
     Network.Protocol.XMPP.Client
+    Network.Protocol.XMPP.Client.Authentication
+    Network.Protocol.XMPP.Client.Features
     Network.Protocol.XMPP.Component
     Network.Protocol.XMPP.Connections
-    Network.Protocol.XMPP.Features
     Network.Protocol.XMPP.Handle
     Network.Protocol.XMPP.JID
     Network.Protocol.XMPP.Stanza

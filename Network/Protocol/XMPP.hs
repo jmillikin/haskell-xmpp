@@ -15,19 +15,64 @@
 
 
 module Network.Protocol.XMPP
-	( module Network.Protocol.XMPP.Client
-	, module Network.Protocol.XMPP.Component
-	, module Network.Protocol.XMPP.JID
-	, module Network.Protocol.XMPP.Stanza
-	, module Network.Protocol.XMPP.Stream
+	( 
+	-- * JIDs
+	  JID (..)
+	, Node
+	, Domain
+	, Resource
+	
+	, strNode
+	, strDomain
+	, strResource
+	
+	, parseJID
+	, formatJID
+	
+	-- * Stanzas
+	, Stanza
+		( stanzaTo
+		, stanzaFrom
+		, stanzaID
+		, stanzaLang
+		, stanzaPayloads
+		)
+	
+	, ReceivedStanza (..)
+	, Message (..)
+	, Presence (..)
+	, IQ (..)
+	, MessageType (..)
+	, PresenceType (..)
+	, IQType (..)
+	
+	, emptyMessage
+	, emptyPresence
+	, emptyIQ
+	
+	-- * Streams
+	, Stream
+	, putStanza
+	, getStanza
+	
+	-- * Connecting to a server
 	, Server (..)
+	
+	-- ** Clients
+	, Client
+	, connectClient
+	, clientJID
+	, bindClient
+	
+	-- ** Components
+	, Component
+	, connectComponent
+	, componentJID
+	, componentStreamID
 	) where
-
+import Network.Protocol.XMPP.JID
 import Network.Protocol.XMPP.Client
 import Network.Protocol.XMPP.Component
-import Network.Protocol.XMPP.JID
-import Network.Protocol.XMPP.Stanza
+import Network.Protocol.XMPP.Connections
 import Network.Protocol.XMPP.Stream
-
-
-import Network.Protocol.XMPP.Internal.Connections
+import Network.Protocol.XMPP.Stanza

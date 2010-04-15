@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-module Network.Protocol.XMPP.Internal.Authentication
+module Network.Protocol.XMPP.Authentication
 	( Result(..)
 	, authenticate
 	) where
@@ -28,8 +28,8 @@ import qualified Text.XML.HXT.DOM.XmlNode as XN
 import qualified Network.Protocol.SASL.GNU as SASL
 
 import Network.Protocol.XMPP.JID (JID, formatJID)
-import Network.Protocol.XMPP.Internal.XML (element, qname)
-import qualified Network.Protocol.XMPP.Internal.Stream as S
+import Network.Protocol.XMPP.XML (element, qname)
+import qualified Network.Protocol.XMPP.Stream as S
 
 data Result = Success | Failure
 	deriving (Show, Eq)

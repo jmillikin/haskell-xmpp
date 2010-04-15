@@ -16,13 +16,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.JID
 	( JID (..)
-	, Node
-	, Domain
-	, Resource
-	
-	, strNode
-	, strDomain
-	, strResource
+	, Node (..)
+	, Domain (..)
+	, Resource (..)
 	
 	, parseJID
 	, formatJID

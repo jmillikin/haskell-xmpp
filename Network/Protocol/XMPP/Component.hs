@@ -35,14 +35,13 @@ import Network.Protocol.SASL.GNU (sha1)
 import qualified System.IO as IO
 import qualified Text.XML.LibXML.SAX as SAX
 
-import qualified Network.Protocol.XMPP.Internal.Connections as C
-import qualified Network.Protocol.XMPP.Internal.Handle as H
+import qualified Network.Protocol.XMPP.Connections as C
+import qualified Network.Protocol.XMPP.Handle as H
 import qualified Network.Protocol.XMPP.Stream as S
-import qualified Network.Protocol.XMPP.Internal.Stream as S
-import Network.Protocol.XMPP.Internal.XML ( getTree, putTree
-                                                 , element, qname
-                                                 , readEventsUntil
-                                                 )
+import Network.Protocol.XMPP.XML ( getTree, putTree
+                                       , element, qname
+                                       , readEventsUntil
+                                       )
 import Network.Protocol.XMPP.JID (JID)
 
 data Component = Component

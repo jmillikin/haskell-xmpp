@@ -14,7 +14,7 @@
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE OverloadedStrings #-}
-module Network.Protocol.XMPP.Internal.Connections
+module Network.Protocol.XMPP.Connections
 	( Server (..)
 	, xmlHeader
 	, startOfStream
@@ -28,7 +28,7 @@ import qualified Text.XML.HXT.DOM.Interface as DOM
 import qualified Text.XML.LibXML.SAX as SAX
 
 import Network.Protocol.XMPP.JID (JID, formatJID)
-import Network.Protocol.XMPP.Internal.XML (qname, convertQName)
+import Network.Protocol.XMPP.XML (qname, convertQName)
 
 data Server = Server
 	{ serverJID      :: JID

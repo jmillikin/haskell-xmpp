@@ -13,7 +13,7 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-module Network.Protocol.XMPP.Internal.Features
+module Network.Protocol.XMPP.Features
 	( Feature (..)
 	, parseFeatures
 	, parseFeature
@@ -23,7 +23,7 @@ import Text.XML.HXT.Arrow ((>>>))
 import qualified Text.XML.HXT.Arrow as A
 import qualified Text.XML.HXT.DOM.Interface as DOM
 import qualified Text.XML.HXT.DOM.XmlNode as XN
-import Network.Protocol.XMPP.Internal.XML (qname)
+import Network.Protocol.XMPP.XML (qname)
 
 data Feature =
 	  FeatureStartTLS Bool

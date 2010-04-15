@@ -21,6 +21,7 @@ module Network.Protocol.XMPP.Component
 	, componentStreamID
 	, connectComponent
 	) where
+import Control.Monad (when)
 import Data.Bits (shiftR, (.&.))
 import Data.Char (intToDigit)
 import qualified Data.ByteString as B
@@ -100,9 +101,8 @@ authenticate stream password = do
 	let accepted = A.runLA $
 		A.getChildren
 		>>> A.hasQName (qname "jabber:component:accept" "handshake")
-	if null (accepted result)
-		then error "Component handshake failed" -- TODO: throwIO
-		else return ()
+	when (null (accepted result)) $
+		error "Component handshake failed" -- TODO: throwIO
 
 buildSecret :: T.Text -> T.Text -> B.ByteString
 buildSecret sid password = bytes where

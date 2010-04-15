@@ -73,7 +73,7 @@ parseJID str = maybeJID where
 	(domain, resource) = case T.spanBy (/= '/') postNode of
 		(x, y) -> if T.null y
 			then (x, "")
-			else (x, T.drop 1 $ y)
+			else (x, T.drop 1 y)
 	mNode = if T.null node then Nothing else Just (Node node)
 	mResource = if T.null resource then Nothing else Just (Resource resource)
 	maybeJID = do
@@ -94,7 +94,7 @@ nodePrep = SP.Profile
 	, SP.shouldNormalize = True
 	, SP.prohibited = [ SP.c11, SP.c12, SP.c21, SP.c22
 	                  , SP.c3, SP.c4, SP.c5, SP.c6, SP.c7, SP.c8, SP.c9
-	                  , map single $ "\"&'/:<>@"
+	                  , map single "\"&'/:<>@"
 	                  ]
 	, SP.shouldCheckBidi = True
 	}

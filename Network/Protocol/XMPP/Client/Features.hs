@@ -19,7 +19,7 @@ module Network.Protocol.XMPP.Client.Features
 	, parseFeature
 	) where
 import qualified Data.ByteString.Char8 as B
-import Text.XML.HXT.Arrow ((>>>))
+import Text.XML.HXT.Arrow ((>>>), (&&&))
 import qualified Text.XML.HXT.Arrow as A
 import qualified Text.XML.HXT.DOM.Interface as DOM
 import qualified Text.XML.HXT.DOM.XmlNode as XN
@@ -35,15 +35,15 @@ data Feature =
 	deriving (Show, Eq)
 
 parseFeatures :: DOM.XmlTree -> [Feature]
-parseFeatures t =
-	A.runLA (A.getChildren
-		>>> A.hasQName qnameFeatures
-		>>> A.getChildren
-		>>> A.arrL (\t' -> [parseFeature t'])) t
+parseFeatures = A.runLA $
+	A.getChildren
+	>>> A.hasQName qnameFeatures
+	>>> A.getChildren
+	>>> A.arrL (\t' -> [parseFeature t'])
 
 parseFeature :: DOM.XmlTree -> Feature
 parseFeature t = feature where
-	mkPair = maybe ("", "") $ \n -> (DOM.namespaceUri n, DOM.localPart n)
+	mkPair = maybe ("", "") $ DOM.namespaceUri &&& DOM.localPart
 	feature = case mkPair (XN.getName t) of
 		("urn:ietf:params:xml:ns:xmpp-tls", "starttls") -> parseFeatureTLS t
 		("urn:ietf:params:xml:ns:xmpp-sasl", "mechanisms") -> parseFeatureSASL t
@@ -56,12 +56,12 @@ parseFeatureTLS :: DOM.XmlTree -> Feature
 parseFeatureTLS t = FeatureStartTLS True -- TODO: detect whether or not required
 
 parseFeatureSASL :: DOM.XmlTree -> Feature
-parseFeatureSASL t = FeatureSASL $ A.runLA (
+parseFeatureSASL = FeatureSASL . A.runLA (
 	A.getChildren
 	>>> A.hasQName qnameMechanism
 	>>> A.getChildren
 	>>> A.getText
-	>>> A.arr B.pack) t
+	>>> A.arr B.pack)
 
 qnameMechanism :: DOM.QName
 qnameMechanism = qname "urn:ietf:params:xml:ns:xmpp-sasl" "mechanism"

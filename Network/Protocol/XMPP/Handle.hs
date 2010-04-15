@@ -20,6 +20,7 @@ module Network.Protocol.XMPP.Handle
 	, hGetChar
 	) where
 
+import Control.Monad (when)
 import qualified System.IO as IO
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as B
@@ -46,7 +47,7 @@ startTLS (PlainHandle h) = do
 hPutBytes :: Handle -> B.ByteString -> IO ()
 hPutBytes (PlainHandle h)          bytes = B.hPut h bytes
 hPutBytes (SecureHandle _ session) bytes = useLoop where
-	useLoop = B.unsafeUseAsCStringLen bytes $ \(ptr, len) -> loop ptr len
+	useLoop = B.unsafeUseAsCStringLen bytes $ uncurry loop
 	loop ptr len = do
 		r <- GnuTLS.tlsSend session ptr len
 		case len - r of
@@ -57,11 +58,9 @@ hGetChar :: Handle -> IO Char
 hGetChar (PlainHandle h) = IO.hGetChar h
 hGetChar (SecureHandle h session) = allocaBytes 1 $ \ptr -> do
 	pending <- GnuTLS.tlsCheckPending session
-	if pending == 0
-		then do
-			IO.hWaitForInput h (-1)
-			return ()
-		else return ()
+	when (pending == 0) $ do
+		IO.hWaitForInput h (-1)
+		return ()
 	
 	len <- GnuTLS.tlsRecv session ptr 1
 	[char] <- peekCAStringLen (ptr, len)

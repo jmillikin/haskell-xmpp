@@ -50,29 +50,18 @@ module Network.Protocol.XMPP
 	, emptyPresence
 	, emptyIQ
 	
-	-- * Streams
-	, Stream
+	-- * The XMPP monad
+	, Server (..)
+	, XMPP
+	, runClient
+	, runComponent
 	, putStanza
 	, getStanza
-	
-	-- * Connecting to a server
-	, Server (..)
-	
-	-- ** Clients
-	, Client
-	, connectClient
-	, clientJID
-	, bindClient
-	
-	-- ** Components
-	, Component
-	, connectComponent
-	, componentJID
-	, componentStreamID
+	, bindJID
 	) where
-import Network.Protocol.XMPP.JID
 import Network.Protocol.XMPP.Client
 import Network.Protocol.XMPP.Component
 import Network.Protocol.XMPP.Connections
-import Network.Protocol.XMPP.Stream
+import Network.Protocol.XMPP.JID
+import Network.Protocol.XMPP.Monad
 import Network.Protocol.XMPP.Stanza

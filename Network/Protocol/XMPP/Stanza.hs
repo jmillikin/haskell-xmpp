@@ -28,7 +28,6 @@ module Network.Protocol.XMPP.Stanza
 	, emptyPresence
 	, emptyIQ
 	
-	, stanzaToTree
 	, treeToStanza
 	) where
 
@@ -52,6 +51,7 @@ data ReceivedStanza
 	= ReceivedMessage Message
 	| ReceivedPresence Presence
 	| ReceivedIQ IQ
+	deriving (Show)
 
 data Message = Message
 	{ messageType     :: MessageType
@@ -61,6 +61,7 @@ data Message = Message
 	, messageLang     :: Maybe T.Text
 	, messagePayloads :: [XmlTree]
 	}
+	deriving (Show)
 
 instance Stanza Message where
 	stanzaTo = messageTo
@@ -102,6 +103,7 @@ data Presence = Presence
 	, presenceLang     :: Maybe T.Text
 	, presencePayloads :: [XmlTree]
 	}
+	deriving (Show)
 
 instance Stanza Presence where
 	stanzaTo = presenceTo
@@ -149,6 +151,7 @@ data IQ = IQ
 	, iqLang    :: Maybe T.Text
 	, iqPayload :: XmlTree
 	}
+	deriving (Show)
 
 instance Stanza IQ where
 	stanzaTo = iqTo

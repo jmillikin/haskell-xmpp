@@ -15,11 +15,11 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.Client
-	( Client
-	, clientJID
-	, connectClient
-	, bindClient
+	( runClient
+	, bindJID
 	) where
+import Control.Monad.Error (throwError)
+import Control.Monad.Trans (liftIO)
 import Network (connectTo)
 import Text.XML.HXT.Arrow ((>>>))
 import qualified Text.XML.HXT.Arrow as A
@@ -28,48 +28,23 @@ import qualified Text.XML.HXT.DOM.XmlNode as XN
 import qualified System.IO as IO
 import Data.ByteString (ByteString)
 import qualified Data.Text as T
-import qualified Text.XML.LibXML.SAX as SAX
 
 import qualified Network.Protocol.XMPP.Client.Authentication as A
 import qualified Network.Protocol.XMPP.Connections as C
 import qualified Network.Protocol.XMPP.Client.Features as F
 import qualified Network.Protocol.XMPP.Handle as H
-import qualified Network.Protocol.XMPP.Stream as S
-import Network.Protocol.XMPP.XML ( getTree, putTree
-                                       , element, qname
-                                       , readEventsUntil
-                                       )
 import qualified Network.Protocol.XMPP.JID as J
+import qualified Network.Protocol.XMPP.Monad as M
+import Network.Protocol.XMPP.XML (element, qname, readEventsUntil)
 import Network.Protocol.XMPP.Stanza
 
-data Client = Client
-	{ clientJID    :: J.JID
-	, clientStream :: ClientStream
-	}
-
-data ClientStream = ClientStream
-	{ streamJID      :: J.JID
-	, streamHandle   :: H.Handle
-	, streamFeatures :: [F.Feature]
-	, streamParser   :: SAX.Parser
-	}
-
-instance S.Stream Client where
-	streamNamespace _ = "jabber:client"
-	getTree = S.getTree . clientStream
-	putTree = S.putTree . clientStream
-
-instance S.Stream ClientStream where
-	streamNamespace _ = "jabber:client"
-	getTree s = getTree (streamHandle s) (streamParser s)
-	putTree s = putTree (streamHandle s)
-
-connectClient :: C.Server
-              -> J.JID -- ^ Client JID
-              -> T.Text -- ^ Username
-              -> T.Text -- ^ Password
-              -> IO Client
-connectClient server jid username password = do
+runClient :: C.Server
+          -> J.JID -- ^ Client JID
+          -> T.Text -- ^ Username
+          -> T.Text -- ^ Password
+          -> M.XMPP a
+          -> IO (Either M.Error a)
+runClient server jid username password xmpp = do
 	-- Open a TCP connection
 	let C.Server sjid host port = server
 	rawHandle <- connectTo host port
@@ -77,41 +52,50 @@ connectClient server jid username password = do
 	let handle = H.PlainHandle rawHandle
 	
 	-- Open the initial stream and authenticate
-	stream <- beginStream sjid handle
-	authedStream <- authenticate stream jid sjid username password
-	return $ Client jid authedStream
+	M.runXMPP handle "jabber:client" $ do
+		features <- newStream sjid
+		let mechanisms = authenticationMechanisms features
+		tryTLS features $ do
+			A.authenticate mechanisms jid sjid username password
+			M.restartXMPP Nothing xmpp
 
-authenticate :: ClientStream -> J.JID -> J.JID -> T.Text -> T.Text -> IO ClientStream
-authenticate stream jid sjid username password = do
-	let mechanisms = authenticationMechanisms stream
-	result <- A.authenticate stream mechanisms jid sjid username password
-	case result of
-		-- TODO: throwIO some exception type?
-		A.Failure -> error "Authentication failure"
-		_ -> restartStream stream
+newStream :: J.JID -> M.XMPP [F.Feature]
+newStream jid = do
+	M.Context h _ sax <- M.getContext
+	liftIO $ H.hPutBytes h $ C.xmlHeader "jabber:client" jid
+	liftIO $ readEventsUntil C.startOfStream h sax
+	F.parseFeatures `fmap` M.getTree
 
-authenticationMechanisms :: ClientStream -> [ByteString]
-authenticationMechanisms = step . streamFeatures where
+tryTLS :: [F.Feature] -> M.XMPP a -> M.XMPP a
+tryTLS features m
+	| not (streamSupportsTLS features) = m
+	| otherwise = do
+		M.putTree xmlStartTLS
+		M.getTree
+		h <- M.getHandle
+		tls <- liftIO $ H.startTLS h
+		M.restartXMPP (Just tls) m
+
+authenticationMechanisms :: [F.Feature] -> [ByteString]
+authenticationMechanisms = step where
 	step [] = []
 	step (f:fs) = case f of
 		(F.FeatureSASL ms) -> ms
 		_ -> step fs
 
-bindClient :: Client -> IO J.JID
-bindClient c = do
+bindJID :: J.JID -> M.XMPP J.JID
+bindJID jid = do
 	-- Bind
-	S.putStanza c $ bindStanza . J.jidResource . clientJID $ c
-	bindResult <- S.getStanza c
+	M.putStanza . bindStanza . J.jidResource $ jid
+	bindResult <- M.getStanza
 	
 	let jidArrow =
 		A.deep (A.hasQName (qname "urn:ietf:params:xml:ns:xmpp-bind" "jid"))
 		>>> A.getChildren
 		>>> A.getText
 	
-	-- TODO: throwIO with exception
-	let Just jid = do
-		result <- bindResult
-		iq <- case result of
+	let maybeJID = do
+		iq <- case bindResult of
 			ReceivedIQ x -> Just x
 			_ -> Nothing
 		
@@ -119,14 +103,18 @@ bindClient c = do
 			[] -> Nothing
 			(str:_) -> J.parseJID (T.pack str)
 	
+	returnedJID <- case maybeJID of
+		Just x -> return x
+		Nothing -> throwError $ M.InvalidBindResult bindResult
+	
 	-- Session
-	S.putStanza c sessionStanza
-	S.getStanza c
+	M.putStanza sessionStanza
+	M.getStanza
 	
-	S.putStanza c $ emptyPresence PresenceAvailable
-	S.getStanza c
+	M.putStanza $ emptyPresence PresenceAvailable
+	M.getStanza
 	
-	return jid
+	return returnedJID
 
 bindStanza :: Maybe J.Resource -> IQ
 bindStanza resource = emptyIQ IQSet payload where
@@ -144,30 +132,8 @@ sessionStanza = emptyIQ IQSet $ element ("", "session")
 	[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-session")]
 	[]
 
-beginStream :: J.JID -> H.Handle -> IO ClientStream
-beginStream jid handle = do
-	plain <- newStream jid handle
-	if streamSupportsTLS plain
-		then do
-			S.putTree plain xmlStartTLS
-			S.getTree plain
-			H.startTLS handle >>= newStream jid
-		else return plain
-
-restartStream :: ClientStream -> IO ClientStream
-restartStream s = newStream (streamJID s) (streamHandle s)
-
-newStream :: J.JID -> H.Handle -> IO ClientStream
-newStream jid h = do
-	parser <- SAX.mkParser
-	H.hPutBytes h $ C.xmlHeader "jabber:client" jid
-	readEventsUntil C.startOfStream h parser
-	features <- F.parseFeatures `fmap` getTree h parser
-	
-	return $ ClientStream jid h features parser
-
-streamSupportsTLS :: ClientStream -> Bool
-streamSupportsTLS = any isStartTLS . streamFeatures where
+streamSupportsTLS :: [F.Feature] -> Bool
+streamSupportsTLS = any isStartTLS where
 	isStartTLS (F.FeatureStartTLS _) = True
 	isStartTLS _                     = False
 

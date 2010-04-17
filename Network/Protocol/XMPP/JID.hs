@@ -21,12 +21,14 @@ module Network.Protocol.XMPP.JID
 	, Resource (..)
 	
 	, parseJID
+	, parseJID_
 	, formatJID
 	) where
 import qualified Data.Text as T
 import qualified Text.StringPrep as SP
 import Text.NamePrep (namePrepProfile)
 import Data.Ranges (single)
+import Data.String (IsString, fromString)
 
 newtype Node = Node { strNode :: T.Text }
 newtype Domain = Domain { strDomain :: T.Text }
@@ -64,6 +66,9 @@ instance Show JID where
 	showsPrec d jid =  showParen (d > 10) $
 		showString "JID " . shows (formatJID jid)
 
+instance IsString JID where
+	fromString = parseJID_ . fromString
+
 parseJID :: T.Text -> Maybe JID
 parseJID str = maybeJID where
 	(node, postNode) = case T.spanBy (/= '@') str of
@@ -81,6 +86,11 @@ parseJID str = maybeJID where
 		SP.runStringPrep domainPrep domain
 		SP.runStringPrep resourcePrep resource
 		Just $ JID mNode (Domain domain) mResource
+
+parseJID_ :: T.Text -> JID
+parseJID_ text = case parseJID text of
+	Just jid -> jid
+	Nothing -> error "Malformed JID"
 
 formatJID :: JID -> T.Text
 formatJID (JID node (Domain domain) resource) = formatted where

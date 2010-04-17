@@ -16,12 +16,11 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.Component
-	( Component
-	, componentJID
-	, componentStreamID
-	, connectComponent
+	( runComponent
 	) where
 import Control.Monad (when)
+import Control.Monad.Error (throwError)
+import Control.Monad.Trans (liftIO)
 import Data.Bits (shiftR, (.&.))
 import Data.Char (intToDigit)
 import qualified Data.ByteString as B
@@ -38,47 +37,32 @@ import qualified Text.XML.LibXML.SAX as SAX
 
 import qualified Network.Protocol.XMPP.Connections as C
 import qualified Network.Protocol.XMPP.Handle as H
-import qualified Network.Protocol.XMPP.Stream as S
-import Network.Protocol.XMPP.XML ( getTree, putTree
-                                       , element, qname
-                                       , readEventsUntil
-                                       )
+import qualified Network.Protocol.XMPP.Monad as M
+import Network.Protocol.XMPP.XML (element, qname, readEventsUntil)
 import Network.Protocol.XMPP.JID (JID)
 
-data Component = Component
-	{ componentJID      :: JID
-	, componentHandle   :: H.Handle
-	, componentParser   :: SAX.Parser
-	, componentStreamID :: T.Text
-	}
-
-instance S.Stream Component where
-	streamNamespace _ = "jabber:component:accept"
-	getTree s = getTree (componentHandle s) (componentParser s)
-	putTree s = putTree (componentHandle s)
-
-connectComponent :: C.Server
-                  -> T.Text -- ^ Password
-                  -> IO Component
-connectComponent server password = do
+runComponent :: C.Server
+             -> T.Text -- ^ Password
+             -> M.XMPP a
+             -> IO (Either M.Error a)
+runComponent server password xmpp = do
 	let C.Server jid host port = server
 	rawHandle <- connectTo host port
 	IO.hSetBuffering rawHandle IO.NoBuffering
 	let handle = H.PlainHandle rawHandle
-	
-	stream <- beginStream jid handle
-	authenticate stream password
-	return stream
+	M.runXMPP handle "jabber:component:accept" $ do
+		streamID <- beginStream jid
+		authenticate streamID password
+		xmpp
 
-beginStream :: JID -> H.Handle -> IO Component
-beginStream jid h = do
-	parser <- SAX.mkParser
-	H.hPutBytes h $ C.xmlHeader "jabber:component:accept" jid
-	events <- readEventsUntil C.startOfStream h parser
-	let streamID' = case parseStreamID $ last events of
-		Nothing -> error "No component stream ID defined"
-		Just x -> x
-	return $ Component jid h parser streamID'
+beginStream :: JID -> M.XMPP T.Text
+beginStream jid = do
+	M.Context h _ sax <- M.getContext
+	liftIO $ H.hPutBytes h $ C.xmlHeader "jabber:component:accept" jid
+	events <- liftIO $ readEventsUntil C.startOfStream h sax
+	case parseStreamID $ last events of
+		Nothing -> throwError M.NoComponentStreamID
+		Just x -> return x
 
 parseStreamID :: SAX.Event -> Maybe T.Text
 parseStreamID (SAX.BeginElement _ attrs) = sid where
@@ -92,17 +76,17 @@ parseStreamID (SAX.BeginElement _ attrs) = sid where
 		]
 parseStreamID _ = Nothing
 
-authenticate :: Component -> T.Text -> IO ()
-authenticate stream password = do
-	let bytes = buildSecret (componentStreamID stream) password
+authenticate :: T.Text -> T.Text -> M.XMPP ()
+authenticate streamID password = do
+	let bytes = buildSecret streamID password
 	let digest = showDigest $ sha1 bytes
-	S.putTree stream $ element ("", "handshake") [] [XN.mkText digest]
-	result <- S.getTree stream
+	M.putTree $ element ("", "handshake") [] [XN.mkText digest]
+	result <- M.getTree
 	let accepted = A.runLA $
 		A.getChildren
 		>>> A.hasQName (qname "jabber:component:accept" "handshake")
 	when (null (accepted result)) $
-		error "Component handshake failed" -- TODO: throwIO
+		throwError M.ComponentHandshakeFailed
 
 buildSecret :: T.Text -> T.Text -> B.ByteString
 buildSecret sid password = bytes where

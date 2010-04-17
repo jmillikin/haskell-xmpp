@@ -31,6 +31,7 @@ library
     , gsasl >= 0.3 && < 0.4
     , network >= 2.2 && < 2.3
     , transformers >= 0.2 && < 0.3
+    , monads-tf >= 0.1 && < 0.2
 
   exposed-modules:
     Network.Protocol.XMPP
@@ -41,8 +42,9 @@ library
     Network.Protocol.XMPP.Client.Features
     Network.Protocol.XMPP.Component
     Network.Protocol.XMPP.Connections
+    Network.Protocol.XMPP.ErrorT
     Network.Protocol.XMPP.Handle
     Network.Protocol.XMPP.JID
+    Network.Protocol.XMPP.Monad
     Network.Protocol.XMPP.Stanza
-    Network.Protocol.XMPP.Stream
     Network.Protocol.XMPP.XML

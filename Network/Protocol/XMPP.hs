@@ -51,8 +51,9 @@ module Network.Protocol.XMPP
 	, emptyIQ
 	
 	-- * The XMPP monad
-	, Server (..)
 	, XMPP
+	, Server (..)
+	, Error (..)
 	, runClient
 	, runComponent
 	, putStanza

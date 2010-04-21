@@ -122,14 +122,14 @@ saslFinish ctx = liftIO $ do
 
 putTree :: M.Context -> XmlTree -> SASL.Session ()
 putTree ctx tree = liftIO $ do
-	res <- M.continueXMPP ctx $ M.putTree tree
+	res <- M.runXMPP ctx $ M.putTree tree
 	case res of
 		Left err -> Exc.throwIO $ XmppError err
 		Right x -> return x
 
 getTree :: M.Context -> IO XmlTree
 getTree ctx = do
-	res <- M.continueXMPP ctx $ M.getTree
+	res <- M.runXMPP ctx $ M.getTree
 	case res of
 		Left err -> Exc.throwIO $ XmppError err
 		Right x -> return x

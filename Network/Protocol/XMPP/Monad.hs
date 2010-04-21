@@ -19,7 +19,7 @@ module Network.Protocol.XMPP.Monad
 	, Error (..)
 	, Context (..)
 	, runXMPP
-	, continueXMPP
+	, startXMPP
 	, restartXMPP
 	
 	, getHandle
@@ -70,13 +70,13 @@ instance E.MonadError XMPP where
 	throwError = XMPP . E.throwError
 	catchError m h = XMPP $ E.catchError (unXMPP m) (unXMPP . h)
 
-runXMPP :: H.Handle -> Text -> XMPP a -> IO (Either Error a)
-runXMPP h ns xmpp = do
-	sax <- SAX.mkParser
-	continueXMPP (Context h ns sax) xmpp
+runXMPP :: Context -> XMPP a -> IO (Either Error a)
+runXMPP ctx xmpp = R.runReaderT (runErrorT (unXMPP xmpp)) ctx
 
-continueXMPP :: Context -> XMPP a -> IO (Either Error a)
-continueXMPP ctx xmpp = R.runReaderT (runErrorT (unXMPP xmpp)) ctx
+startXMPP :: H.Handle -> Text -> XMPP a -> IO (Either Error a)
+startXMPP h ns xmpp = do
+	sax <- SAX.mkParser
+	runXMPP (Context h ns sax) xmpp
 
 restartXMPP :: Maybe H.Handle -> XMPP a -> XMPP a
 restartXMPP newH xmpp = do

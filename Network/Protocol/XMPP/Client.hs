@@ -52,7 +52,7 @@ runClient server jid username password xmpp = do
 	let handle = H.PlainHandle rawHandle
 	
 	-- Open the initial stream and authenticate
-	M.runXMPP handle "jabber:client" $ do
+	M.startXMPP handle "jabber:client" $ do
 		features <- newStream sjid
 		let mechanisms = authenticationMechanisms features
 		tryTLS features $ do

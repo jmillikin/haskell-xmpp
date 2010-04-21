@@ -50,7 +50,7 @@ runComponent server password xmpp = do
 	rawHandle <- connectTo host port
 	IO.hSetBuffering rawHandle IO.NoBuffering
 	let handle = H.PlainHandle rawHandle
-	M.runXMPP handle "jabber:component:accept" $ do
+	M.startXMPP handle "jabber:component:accept" $ do
 		streamID <- beginStream jid
 		authenticate streamID password
 		xmpp

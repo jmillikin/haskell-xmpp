@@ -14,16 +14,16 @@
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 module Network.Protocol.XMPP.XML
-	( getTree
-	, putTree
-	, readEventsUntil
+	( readEvents
+	, eventsToTree
 	, convertQName
 	, element
 	, attr
 	, qname
 	) where
-import qualified Network.Protocol.XMPP.Handle as H
+import Control.Monad.Trans (MonadIO, liftIO)
 import qualified Data.ByteString.Char8 as C8
+import qualified Network.Protocol.XMPP.Handle as H
 
 -- XML Parsing
 import Text.XML.HXT.Arrow ((>>>))
@@ -32,44 +32,29 @@ import qualified Text.XML.HXT.DOM.Interface as DOM
 import qualified Text.XML.HXT.DOM.XmlNode as XN
 import qualified Text.XML.LibXML.SAX as SAX
 
-getTree :: H.Handle -> SAX.Parser -> IO DOM.XmlTree
-getTree h p = eventsToTree `fmap` readEventsUntil finished h p where
-	finished 0 (SAX.EndElement _) = True
-	finished _ _ = False
-
-putTree :: H.Handle -> DOM.XmlTree -> IO ()
-putTree h t = do
-	let root = XN.mkRoot [] [t]
-	[text] <- A.runX (A.constA root >>> A.writeDocumentToString [
-		(A.a_no_xml_pi, "1")
-		])
-	H.hPutBytes h $ C8.pack text
-
--------------------------------------------------------------------------------
-
-readEventsUntil :: (Int -> SAX.Event -> Bool) -> H.Handle -> SAX.Parser -> IO [SAX.Event]
-readEventsUntil done h parser = readEventsUntil' done 0 [] $ do
-	char <- H.hGetChar h
-	SAX.parse parser [char] False
-
-readEventsUntil' :: (Int -> SAX.Event -> Bool) -> Int -> [SAX.Event] -> IO [SAX.Event] -> IO [SAX.Event]
-readEventsUntil' done depth accum getEvents = do
-	events <- getEvents
-	let (done', depth', accum') = readEventsStep done events depth accum
-	if done'
-		then return accum'
-		else readEventsUntil' done depth' accum' getEvents
-
-readEventsStep :: (Int -> SAX.Event -> Bool) -> [SAX.Event] -> Int -> [SAX.Event] -> (Bool, Int, [SAX.Event])
-readEventsStep _ [] depth accum = (False, depth, accum)
-readEventsStep done (e:es) depth accum = let
-	depth' = depth + case e of
-		(SAX.BeginElement _ _) -> 1
-		(SAX.EndElement _) -> (- 1)
-		_ -> 0
-	accum' = accum ++ [e]
-	in if done depth' e then (True, depth', accum')
-	else readEventsStep done es depth' accum'
+readEvents :: MonadIO m => (Integer -> SAX.Event -> Bool) -> m Char -> SAX.Parser -> m [SAX.Event]
+readEvents done getChar parser = readEvents' 0 [] where
+	nextEvents = do
+		char <- getChar
+		liftIO $ SAX.parse parser [char] False
+	
+	readEvents' depth acc = do
+		events <- nextEvents
+		let (done', depth', acc') = step events depth acc
+		if done'
+			then return acc'
+			else readEvents' depth' acc'
+	
+	step []     depth acc = (False, depth, acc)
+	step (e:es) depth acc = let
+		depth' = depth + case e of
+			(SAX.BeginElement _ _) -> 1
+			(SAX.EndElement _) -> (- 1)
+			_ -> 0
+		acc' = e : acc
+		in if done depth' e
+			then (True, depth', reverse acc')
+			else step es depth' acc'
 
 -------------------------------------------------------------------------------
 -- For converting incremental XML event lists to HXT trees

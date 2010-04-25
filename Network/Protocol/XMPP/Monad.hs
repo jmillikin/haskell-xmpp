@@ -25,28 +25,39 @@ module Network.Protocol.XMPP.Monad
 	, getHandle
 	, getContext
 	
-	, putTree
+	, readEvents
+	, getChar
 	, getTree
-	
-	, putStanza
 	, getStanza
+	
+	, putBytes
+	, putTree
+	, putStanza
 	) where
+import Prelude hiding (getChar)
 import Control.Monad.Trans (MonadIO, liftIO)
 import qualified Control.Monad.Error as E
 import qualified Control.Monad.Reader as R
+import qualified Data.ByteString.Char8 as B
 import Data.Text (Text)
-import Text.XML.HXT.DOM.Interface (XmlTree)
+
+import Text.XML.HXT.Arrow ((>>>))
+import qualified Text.XML.HXT.Arrow as A
+import qualified Text.XML.HXT.DOM.Interface as DOM
+import qualified Text.XML.HXT.DOM.XmlNode as XN
 import qualified Text.XML.LibXML.SAX as SAX
+
 import Network.Protocol.XMPP.ErrorT
 import qualified Network.Protocol.XMPP.Handle as H
 import qualified Network.Protocol.XMPP.Stanza as S
 import qualified Network.Protocol.XMPP.XML as X
 
 data Error
-	= InvalidStanza XmlTree
+	= InvalidStanza DOM.XmlTree
 	| InvalidBindResult S.ReceivedStanza
 	| AuthenticationFailure
 	| AuthenticationError Text
+	| TransportError Text
 	| NoComponentStreamID
 	| ComponentHandshakeFailed
 	deriving (Show)
@@ -93,18 +104,45 @@ getHandle = do
 	Context h _ _ <- getContext
 	return h
 
-putTree :: XmlTree -> XMPP ()
-putTree t = do
-	h <- getHandle
-	liftIO $ X.putTree h t
+liftTLS :: ErrorT Text IO a -> XMPP a
+liftTLS io = do
+	res <- liftIO $ runErrorT io
+	case res of
+		Left err -> E.throwError $ TransportError err
+		Right x -> return x
 
-getTree :: XMPP XmlTree
-getTree = do
-	Context h _ sax <- getContext
-	liftIO $ X.getTree h sax
+
+putBytes :: B.ByteString -> XMPP ()
+putBytes bytes = do
+	h <- getHandle
+	liftTLS $ H.hPutBytes h bytes
+
+getChar :: XMPP Char
+getChar = do
+	h <- getHandle
+	liftTLS $ H.hGetChar h
+
+putTree :: DOM.XmlTree -> XMPP ()
+putTree t = do
+	let root = XN.mkRoot [] [t]
+	[text] <- liftIO $ A.runX (A.constA root >>> A.writeDocumentToString [
+		(A.a_no_xml_pi, "1")
+		])
+	h <- getHandle
+	liftTLS $ H.hPutBytes h $ B.pack text
 
 putStanza :: S.Stanza a => a -> XMPP ()
 putStanza = putTree . S.stanzaToTree
+
+readEvents :: (Integer -> SAX.Event -> Bool) -> XMPP [SAX.Event]
+readEvents done = do
+	Context h _ p <- getContext
+	X.readEvents done (liftTLS $ H.hGetChar h) p
+
+getTree :: XMPP DOM.XmlTree
+getTree = X.eventsToTree `fmap` readEvents endOfTree where
+	endOfTree 0 (SAX.EndElement _) = True
+	endOfTree _ _ = False
 
 getStanza :: XMPP S.ReceivedStanza
 getStanza = do

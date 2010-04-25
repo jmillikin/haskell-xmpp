@@ -35,7 +35,8 @@ import qualified Network.Protocol.XMPP.Client.Features as F
 import qualified Network.Protocol.XMPP.Handle as H
 import qualified Network.Protocol.XMPP.JID as J
 import qualified Network.Protocol.XMPP.Monad as M
-import Network.Protocol.XMPP.XML (element, qname, readEventsUntil)
+import Network.Protocol.XMPP.XML (element, qname)
+import Network.Protocol.XMPP.ErrorT
 import Network.Protocol.XMPP.Stanza
 
 runClient :: C.Server
@@ -61,9 +62,8 @@ runClient server jid username password xmpp = do
 
 newStream :: J.JID -> M.XMPP [F.Feature]
 newStream jid = do
-	M.Context h _ sax <- M.getContext
-	liftIO $ H.hPutBytes h $ C.xmlHeader "jabber:client" jid
-	liftIO $ readEventsUntil C.startOfStream h sax
+	M.putBytes $ C.xmlHeader "jabber:client" jid
+	M.readEvents C.startOfStream
 	F.parseFeatures `fmap` M.getTree
 
 tryTLS :: [F.Feature] -> M.XMPP a -> M.XMPP a
@@ -73,8 +73,10 @@ tryTLS features m
 		M.putTree xmlStartTLS
 		M.getTree
 		h <- M.getHandle
-		tls <- liftIO $ H.startTLS h
-		M.restartXMPP (Just tls) m
+		eitherTLS <- liftIO $ runErrorT $ H.startTLS h
+		case eitherTLS of
+			Left err -> throwError $ M.TransportError err
+			Right tls -> M.restartXMPP (Just tls) m
 
 authenticationMechanisms :: [F.Feature] -> [ByteString]
 authenticationMechanisms = step where

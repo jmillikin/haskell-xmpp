@@ -20,7 +20,6 @@ module Network.Protocol.XMPP.Component
 	) where
 import Control.Monad (when)
 import Control.Monad.Error (throwError)
-import Control.Monad.Trans (liftIO)
 import Data.Bits (shiftR, (.&.))
 import Data.Char (intToDigit)
 import qualified Data.ByteString as B
@@ -38,7 +37,7 @@ import qualified Text.XML.LibXML.SAX as SAX
 import qualified Network.Protocol.XMPP.Connections as C
 import qualified Network.Protocol.XMPP.Handle as H
 import qualified Network.Protocol.XMPP.Monad as M
-import Network.Protocol.XMPP.XML (element, qname, readEventsUntil)
+import Network.Protocol.XMPP.XML (element, qname)
 import Network.Protocol.XMPP.JID (JID)
 
 runComponent :: C.Server
@@ -57,9 +56,8 @@ runComponent server password xmpp = do
 
 beginStream :: JID -> M.XMPP T.Text
 beginStream jid = do
-	M.Context h _ sax <- M.getContext
-	liftIO $ H.hPutBytes h $ C.xmlHeader "jabber:component:accept" jid
-	events <- liftIO $ readEventsUntil C.startOfStream h sax
+	M.putBytes $ C.xmlHeader "jabber:component:accept" jid
+	events <- M.readEvents C.startOfStream
 	case parseStreamID $ last events of
 		Nothing -> throwError M.NoComponentStreamID
 		Just x -> return x

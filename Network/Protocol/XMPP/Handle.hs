@@ -24,49 +24,46 @@ module Network.Protocol.XMPP.Handle
 import Control.Monad (when)
 import qualified Control.Monad.Error as E
 import Control.Monad.Trans (liftIO)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Unsafe as B
+import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 import qualified System.IO as IO
-import qualified Network.GnuTLS as GnuTLS
-import Network.GnuTLS (AttrOp (..))
-import Foreign (allocaBytes, plusPtr)
-import Foreign.C (peekCAStringLen)
+import qualified Network.Protocol.TLS.GNU as TLS
 import Network.Protocol.XMPP.ErrorT
 
 data Handle =
 	  PlainHandle IO.Handle
-	| SecureHandle IO.Handle (GnuTLS.Session GnuTLS.Client)
+	| SecureHandle IO.Handle TLS.Session
+
+liftTLS :: TLS.Session -> TLS.TLS a -> ErrorT T.Text IO a
+liftTLS s = liftTLS' . TLS.runTLS s
+
+liftTLS' :: IO (Either TLS.Error a) -> ErrorT T.Text IO a
+liftTLS' io = do
+	eitherX <- liftIO io
+	case eitherX of
+		Left err -> E.throwError $ T.pack $ show err
+		Right x -> return x
 
 startTLS :: Handle -> ErrorT T.Text IO Handle
 startTLS (SecureHandle _ _) = E.throwError "Can't start TLS on a secure handle"
-startTLS (PlainHandle h) = liftIO $ do
-	session <- GnuTLS.tlsClient
-		[ GnuTLS.handle := h
-		, GnuTLS.priorities := [GnuTLS.CrtX509]
-		, GnuTLS.credentials := GnuTLS.certificateCredentials
-		]
-	GnuTLS.handshake session
-	return $ SecureHandle h session
+startTLS (PlainHandle h) = liftTLS' $ TLS.runClient $ do
+	TLS.setTransport $ TLS.transportHandle h
+	TLS.setPriority [TLS.X509]
+	TLS.setCredentials TLS.certificateCredentials
+	TLS.handshake
+	SecureHandle h `fmap` TLS.getSession
 
 hPutBytes :: Handle -> B.ByteString -> ErrorT T.Text IO ()
-hPutBytes (PlainHandle h)           bytes = liftIO $ B.hPut h bytes
-hPutBytes (SecureHandle _ session) bytes = liftIO useLoop where
-	useLoop = B.unsafeUseAsCStringLen bytes $ uncurry loop
-	loop ptr len = do
-		r <- GnuTLS.tlsSend session ptr len
-		case len - r of
-			x | x > 0     -> loop (plusPtr ptr r) x
-			  | otherwise -> return ()
+hPutBytes (PlainHandle h)  = liftIO . B.hPut h
+hPutBytes (SecureHandle _ s) = liftTLS s . TLS.putBytes
 
 hGetChar :: Handle -> ErrorT T.Text IO Char
 hGetChar (PlainHandle h) = liftIO $ IO.hGetChar h
-hGetChar (SecureHandle h session) = liftIO $ allocaBytes 1 $ \ptr -> do
-	pending <- GnuTLS.tlsCheckPending session
+hGetChar (SecureHandle h s) = liftTLS s $ do
+	pending <- TLS.checkPending
 	when (pending == 0) $ do
-		IO.hWaitForInput h (-1)
+		liftIO $ IO.hWaitForInput h (- 1)
 		return ()
 	
-	len <- GnuTLS.tlsRecv session ptr 1
-	[char] <- peekCAStringLen (ptr, len)
-	return char
+	bytes <- TLS.getBytes 1
+	return . head . B.unpack $ bytes

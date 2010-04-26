@@ -23,7 +23,8 @@ module Network.Protocol.XMPP.XML
 	) where
 import Control.Monad.Trans (MonadIO, liftIO)
 import qualified Data.ByteString.Char8 as C8
-import qualified Network.Protocol.XMPP.Handle as H
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 
 -- XML Parsing
 import Text.XML.HXT.Arrow ((>>>))
@@ -95,17 +96,17 @@ blockToTrees (begin:rest) = let end = (last rest) in case (begin, end) of
 		[XN.mkElement (convertQName qname')
 			(map convertAttr attrs)
 			(eventsToTrees (init rest))]
-	(SAX.Characters s, _) -> [XN.mkText s]
+	(SAX.Characters s, _) -> [XN.mkText $ utf8 s]
 	(_, SAX.ParseError text) -> error text
 	_ -> []
 
 convertAttr :: SAX.Attribute -> DOM.XmlTree
 convertAttr (SAX.Attribute qname' value) = XN.NTree
 	(XN.mkAttrNode (convertQName qname'))
-	[XN.mkText value]
+	[XN.mkText $ utf8 value]
 
 convertQName :: SAX.QName -> DOM.QName
-convertQName (SAX.QName ns _ local) = qname ns local
+convertQName (SAX.QName ns _ local) = qname (utf8 ns) (utf8 local)
 
 -------------------------------------------------------------------------------
 -- Utility functions for building XML trees
@@ -124,3 +125,6 @@ qname :: String -> String -> DOM.QName
 qname ns localpart = case ns of
 	"" -> DOM.mkName localpart
 	_ -> DOM.mkNsName localpart ns
+
+utf8 :: String -> String
+utf8 = T.unpack . TE.decodeUtf8 . C8.pack

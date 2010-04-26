@@ -55,10 +55,10 @@ runClient server jid username password xmpp = do
 	-- Open the initial stream and authenticate
 	M.startXMPP handle "jabber:client" $ do
 		features <- newStream sjid
-		let mechanisms = authenticationMechanisms features
-		tryTLS features $ do
+		tryTLS sjid features $ \tlsFeatures -> do
+			let mechanisms = authenticationMechanisms tlsFeatures
 			A.authenticate mechanisms jid sjid username password
-			M.restartXMPP Nothing xmpp
+			M.restartXMPP Nothing (newStream sjid >> xmpp)
 
 newStream :: J.JID -> M.XMPP [F.Feature]
 newStream jid = do
@@ -66,9 +66,9 @@ newStream jid = do
 	M.readEvents C.startOfStream
 	F.parseFeatures `fmap` M.getTree
 
-tryTLS :: [F.Feature] -> M.XMPP a -> M.XMPP a
-tryTLS features m
-	| not (streamSupportsTLS features) = m
+tryTLS :: J.JID -> [F.Feature] -> ([F.Feature] -> M.XMPP a) -> M.XMPP a
+tryTLS sjid features m
+	| not (streamSupportsTLS features) = m features
 	| otherwise = do
 		M.putTree xmlStartTLS
 		M.getTree
@@ -76,7 +76,7 @@ tryTLS features m
 		eitherTLS <- liftIO $ runErrorT $ H.startTLS h
 		case eitherTLS of
 			Left err -> throwError $ M.TransportError err
-			Right tls -> M.restartXMPP (Just tls) m
+			Right tls -> M.restartXMPP (Just tls) $ newStream sjid >>= m
 
 authenticationMechanisms :: [F.Feature] -> [ByteString]
 authenticationMechanisms = step where

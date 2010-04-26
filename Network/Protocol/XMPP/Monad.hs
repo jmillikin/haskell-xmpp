@@ -128,8 +128,7 @@ putTree t = do
 	[text] <- liftIO $ A.runX (A.constA root >>> A.writeDocumentToString [
 		(A.a_no_xml_pi, "1")
 		])
-	h <- getHandle
-	liftTLS $ H.hPutBytes h $ B.pack text
+	putBytes $ B.pack text
 
 putStanza :: S.Stanza a => a -> XMPP ()
 putStanza = putTree . S.stanzaToTree

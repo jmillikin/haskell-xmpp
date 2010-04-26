@@ -149,7 +149,7 @@ data IQ = IQ
 	, iqFrom    :: Maybe JID
 	, iqID      :: Maybe T.Text
 	, iqLang    :: Maybe T.Text
-	, iqPayload :: XmlTree
+	, iqPayload :: Maybe XmlTree
 	}
 	deriving (Show)
 
@@ -158,7 +158,9 @@ instance Stanza IQ where
 	stanzaFrom = iqFrom
 	stanzaID = iqID
 	stanzaLang = iqLang
-	stanzaPayloads iq = [iqPayload iq]
+	stanzaPayloads iq = case iqPayload iq of
+		Just tree -> [tree]
+		Nothing -> []
 	stanzaToTree x = stanzaToTree' x "iq" typeStr where
 		typeStr = case iqType x of
 			IQGet -> "get"
@@ -173,14 +175,14 @@ data IQType
 	| IQError
 	deriving (Show, Eq)
 
-emptyIQ :: IQType -> XmlTree -> IQ
-emptyIQ t tree = IQ
+emptyIQ :: IQType -> IQ
+emptyIQ t = IQ
 	{ iqType = t
 	, iqTo = Nothing
 	, iqFrom = Nothing
 	, iqID = Nothing
 	, iqLang = Nothing
-	, iqPayload = tree
+	, iqPayload = Nothing
 	}
 
 stanzaToTree' :: Stanza a => a -> String -> String -> XmlTree
@@ -257,11 +259,12 @@ parseIQ t = do
 		"result" -> Just IQResult
 		"error"  -> Just IQError
 		_        -> Nothing
+	
 	msgTo <- xmlJID "to" t
 	msgFrom <- xmlJID "from" t
 	let msgID = T.pack `fmap` runMA (A.getAttrValue "id") t
 	let msgLang = T.pack `fmap` runMA (A.getAttrValue "lang") t
-	payload <- runMA (A.getChildren >>> A.isElem) t
+	let payload = runMA (A.getChildren >>> A.isElem) t
 	return $ IQ iqType msgTo msgFrom msgID msgLang payload
 
 xmlJID :: String -> XmlTree -> Maybe (Maybe JID)

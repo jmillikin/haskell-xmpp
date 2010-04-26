@@ -38,7 +38,7 @@ import Prelude hiding (getChar)
 import Control.Monad.Trans (MonadIO, liftIO)
 import qualified Control.Monad.Error as E
 import qualified Control.Monad.Reader as R
-import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Lazy.Char8 as B
 import Data.Text (Text)
 
 import Text.XML.HXT.Arrow ((>>>))

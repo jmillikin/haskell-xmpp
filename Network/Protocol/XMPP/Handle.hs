@@ -24,7 +24,7 @@ module Network.Protocol.XMPP.Handle
 import Control.Monad (when)
 import qualified Control.Monad.Error as E
 import Control.Monad.Trans (liftIO)
-import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Lazy.Char8 as B
 import qualified Data.Text as T
 import qualified System.IO as IO
 import qualified Network.Protocol.TLS.GNU as TLS

@@ -35,7 +35,7 @@ import Text.XML.HXT.DOM.Interface (XmlTree)
 import qualified Network.Protocol.SASL.GNU as SASL
 
 import qualified Network.Protocol.XMPP.Monad as M
-import Network.Protocol.XMPP.JID (JID, formatJID)
+import Network.Protocol.XMPP.JID (JID, formatJID, jidResource)
 import Network.Protocol.XMPP.XML (element, qname)
 
 data Result = Success | Failure
@@ -54,7 +54,7 @@ authenticate :: [B.ByteString] -- ^ Mechanisms
              -> M.XMPP ()
 authenticate xmppMechanisms userJID serverJID username password = xmpp where
 	mechanisms = map SASL.Mechanism xmppMechanisms
-	authz = formatJID userJID
+	authz = formatJID $ userJID { jidResource = Nothing }
 	hostname = formatJID serverJID
 	utf8 = TE.encodeUtf8
 	

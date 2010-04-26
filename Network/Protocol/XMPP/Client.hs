@@ -100,8 +100,9 @@ bindJID jid = do
 		iq <- case bindResult of
 			ReceivedIQ x -> Just x
 			_ -> Nothing
+		payload <- iqPayload iq
 		
-		case A.runLA jidArrow (iqPayload iq) of
+		case A.runLA jidArrow payload of
 			[] -> Nothing
 			(str:_) -> J.parseJID (T.pack str)
 	
@@ -119,7 +120,7 @@ bindJID jid = do
 	return returnedJID
 
 bindStanza :: Maybe J.Resource -> IQ
-bindStanza resource = emptyIQ IQSet payload where
+bindStanza resource = (emptyIQ IQSet) { iqPayload = Just payload } where
 	payload = element ("", "bind")
 		[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-bind")]
 		requested
@@ -130,9 +131,10 @@ bindStanza resource = emptyIQ IQSet payload where
 			[XN.mkText (T.unpack x)]]
 
 sessionStanza :: IQ
-sessionStanza = emptyIQ IQSet $ element ("", "session")
-	[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-session")]
-	[]
+sessionStanza = (emptyIQ IQSet) { iqPayload = Just payload } where
+	payload = element ("", "session")
+		[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-session")]
+		[]
 
 streamSupportsTLS :: [F.Feature] -> Bool
 streamSupportsTLS = any isStartTLS where

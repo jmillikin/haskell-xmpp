@@ -59,11 +59,14 @@ hPutBytes (SecureHandle _ s) = liftTLS s . TLS.putBytes
 
 hGetChar :: Handle -> ErrorT T.Text IO Char
 hGetChar (PlainHandle h) = liftIO $ IO.hGetChar h
-hGetChar (SecureHandle h s) = liftTLS s $ do
-	pending <- TLS.checkPending
-	when (pending == 0) $ do
-		liftIO $ IO.hWaitForInput h (- 1)
-		return ()
-	
-	bytes <- TLS.getBytes 1
-	return . head . B.unpack $ bytes
+hGetChar (SecureHandle h s) = do
+	bytes <- liftTLS s $ do
+		pending <- TLS.checkPending
+		when (pending == 0) $ do
+			liftIO $ IO.hWaitForInput h (- 1)
+			return ()
+		
+		TLS.getBytes 1
+	case B.unpack bytes of
+		(c:_) -> return c
+		_ -> E.throwError "hGetChar: not enough bytes"

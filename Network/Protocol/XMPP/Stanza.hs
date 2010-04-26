@@ -198,7 +198,8 @@ stanzaToTree' stanza name typeStr = element ("", name) attrs payloads where
 		Just text -> [("", label, T.unpack text)]
 
 treeToStanza :: T.Text -> XmlTree -> Maybe ReceivedStanza
-treeToStanza ns tree = do
+treeToStanza ns root = do
+	tree <- runMA A.getChildren root
 	treeNS <- runMA A.getNamespaceUri tree
 	if T.pack treeNS == ns then Just () else Nothing
 	

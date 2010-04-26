@@ -25,9 +25,7 @@ module Network.Protocol.XMPP.JID
 	, formatJID
 	) where
 import qualified Data.Text as T
-import qualified Text.StringPrep as SP
-import Text.NamePrep (namePrepProfile)
-import Data.Ranges (single)
+import qualified Data.Text.IDN.StringPrep as SP
 import Data.String (IsString, fromString)
 
 newtype Node = Node { strNode :: T.Text }
@@ -47,13 +45,13 @@ instance Show Resource where
 		showString "Resource " . shows x
 
 instance Eq Node where
-	(==) = equaling (SP.runStringPrep nodePrep . strNode)
+	(==) = equaling strNode
 
 instance Eq Domain where
-	(==) = equaling (SP.runStringPrep domainPrep . strDomain)
+	(==) = equaling strDomain
 
 instance Eq Resource where
-	(==) = equaling (SP.runStringPrep resourcePrep . strResource)
+	(==) = equaling strResource
 
 data JID = JID
 	{ jidNode :: Maybe Node
@@ -79,13 +77,18 @@ parseJID str = maybeJID where
 		(x, y) -> if T.null y
 			then (x, "")
 			else (x, T.drop 1 y)
-	mNode = if T.null node then Nothing else Just (Node node)
-	mResource = if T.null resource then Nothing else Just (Resource resource)
+	nullable x f = if T.null x then Just Nothing else fmap Just $ f x
 	maybeJID = do
-		SP.runStringPrep nodePrep node
-		SP.runStringPrep domainPrep domain
-		SP.runStringPrep resourcePrep resource
-		Just $ JID mNode (Domain domain) mResource
+		preppedNode <- nullable node $ stringprepM SP.profileNodeprep
+		preppedDomain <- stringprepM SP.profileNameprep domain
+		preppedResource <- nullable resource $ stringprepM SP.profileResourceprep
+		return $ JID
+			(fmap Node preppedNode)
+			(Domain preppedDomain)
+			(fmap Resource preppedResource)
+	stringprepM p x = case SP.stringprep p SP.defaultFlags x of
+		Left _ -> Nothing
+		Right y -> Just y
 
 parseJID_ :: T.Text -> JID
 parseJID_ text = case parseJID text of
@@ -97,29 +100,6 @@ formatJID (JID node (Domain domain) resource) = formatted where
 	formatted = T.concat [node', domain, resource']
 	node' = maybe "" (\(Node x) -> T.append x "@") node
 	resource' = maybe "" (\(Resource x) -> T.append "/" x) resource
-
-nodePrep :: SP.StringPrepProfile
-nodePrep = SP.Profile
-	{ SP.maps = [SP.b1, SP.b2]
-	, SP.shouldNormalize = True
-	, SP.prohibited = [ SP.c11, SP.c12, SP.c21, SP.c22
-	                  , SP.c3, SP.c4, SP.c5, SP.c6, SP.c7, SP.c8, SP.c9
-	                  , map single "\"&'/:<>@"
-	                  ]
-	, SP.shouldCheckBidi = True
-	}
-
-domainPrep :: SP.StringPrepProfile
-domainPrep = namePrepProfile False
-
-resourcePrep :: SP.StringPrepProfile
-resourcePrep = SP.Profile
-	{ SP.maps = [SP.b1]
-	, SP.shouldNormalize = True
-	, SP.prohibited = [ SP.c12, SP.c21, SP.c22
-	                  , SP.c3, SP.c4, SP.c5, SP.c6, SP.c7, SP.c8, SP.c9]
-	, SP.shouldCheckBidi = True
-	}
 
 -- Similar to 'comparing'
 equaling :: Eq a => (b -> a) -> b -> b -> Bool

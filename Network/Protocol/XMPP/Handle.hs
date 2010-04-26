@@ -46,10 +46,9 @@ liftTLS' io = do
 
 startTLS :: Handle -> ErrorT T.Text IO Handle
 startTLS (SecureHandle _ _) = E.throwError "Can't start TLS on a secure handle"
-startTLS (PlainHandle h) = liftTLS' $ TLS.runClient $ do
-	TLS.setTransport $ TLS.transportHandle h
+startTLS (PlainHandle h) = liftTLS' $ TLS.runClient (TLS.handleTransport h) $ do
 	TLS.setPriority [TLS.X509]
-	TLS.setCredentials TLS.certificateCredentials
+	TLS.setCredentials =<< TLS.certificateCredentials
 	TLS.handshake
 	SecureHandle h `fmap` TLS.getSession
 

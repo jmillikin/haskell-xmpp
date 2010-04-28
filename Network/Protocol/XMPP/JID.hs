@@ -24,7 +24,7 @@ module Network.Protocol.XMPP.JID
 	, parseJID_
 	, formatJID
 	) where
-import qualified Data.Text as T
+import qualified Data.Text.Lazy as T
 import qualified Data.Text.IDN.StringPrep as SP
 import Data.String (IsString, fromString)
 

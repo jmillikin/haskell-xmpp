@@ -27,7 +27,7 @@ import qualified Text.XML.HXT.DOM.Interface as DOM
 import qualified Text.XML.HXT.DOM.XmlNode as XN
 import qualified System.IO as IO
 import Data.ByteString (ByteString)
-import qualified Data.Text as T
+import qualified Data.Text.Lazy as T
 
 import qualified Network.Protocol.XMPP.Client.Authentication as A
 import qualified Network.Protocol.XMPP.Connections as C

@@ -26,7 +26,6 @@ module Network.Protocol.XMPP.Monad
 	, getContext
 	
 	, readEvents
-	, getChar
 	, getTree
 	, getStanza
 	
@@ -34,7 +33,6 @@ module Network.Protocol.XMPP.Monad
 	, putTree
 	, putStanza
 	) where
-import Prelude hiding (getChar)
 import Control.Monad.Trans (MonadIO, liftIO)
 import qualified Control.Monad.Error as E
 import qualified Control.Monad.Reader as R
@@ -111,16 +109,10 @@ liftTLS io = do
 		Left err -> E.throwError $ TransportError err
 		Right x -> return x
 
-
 putBytes :: B.ByteString -> XMPP ()
 putBytes bytes = do
 	h <- getHandle
 	liftTLS $ H.hPutBytes h bytes
-
-getChar :: XMPP Char
-getChar = do
-	h <- getHandle
-	liftTLS $ H.hGetChar h
 
 putTree :: DOM.XmlTree -> XMPP ()
 putTree t = do
@@ -136,7 +128,11 @@ putStanza = putTree . S.stanzaToTree
 readEvents :: (Integer -> SAX.Event -> Bool) -> XMPP [SAX.Event]
 readEvents done = do
 	Context h _ p <- getContext
-	X.readEvents done (liftTLS $ H.hGetChar h) p
+	let nextChar = do
+		-- TODO: read in larger increments
+		bytes <- liftTLS $ H.hGetBytes h 1
+		return $ B.unpack bytes
+	X.readEvents done nextChar p
 
 getTree :: XMPP DOM.XmlTree
 getTree = X.eventsToTree `fmap` readEvents endOfTree where

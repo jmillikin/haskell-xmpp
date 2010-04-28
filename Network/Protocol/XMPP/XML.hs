@@ -33,11 +33,11 @@ import qualified Text.XML.HXT.DOM.Interface as DOM
 import qualified Text.XML.HXT.DOM.XmlNode as XN
 import qualified Text.XML.LibXML.SAX as SAX
 
-readEvents :: MonadIO m => (Integer -> SAX.Event -> Bool) -> m Char -> SAX.Parser -> m [SAX.Event]
-readEvents done getChar parser = readEvents' 0 [] where
+readEvents :: MonadIO m => (Integer -> SAX.Event -> Bool) -> m String -> SAX.Parser -> m [SAX.Event]
+readEvents done getChars parser = readEvents' 0 [] where
 	nextEvents = do
-		char <- getChar
-		liftIO $ SAX.parse parser [char] False
+		chars <- getChars
+		liftIO $ SAX.parse parser chars False
 	
 	readEvents' depth acc = do
 		events <- nextEvents

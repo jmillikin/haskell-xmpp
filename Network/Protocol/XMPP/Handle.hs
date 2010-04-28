@@ -18,13 +18,13 @@ module Network.Protocol.XMPP.Handle
 	( Handle (..)
 	, startTLS
 	, hPutBytes
-	, hGetChar
+	, hGetBytes
 	) where
 
 import Control.Monad (when)
 import qualified Control.Monad.Error as E
 import Control.Monad.Trans (liftIO)
-import qualified Data.ByteString.Lazy.Char8 as B
+import qualified Data.ByteString.Lazy as B
 import qualified Data.Text.Lazy as T
 import qualified System.IO as IO
 import qualified Network.Protocol.TLS.GNU as TLS
@@ -56,16 +56,12 @@ hPutBytes :: Handle -> B.ByteString -> ErrorT T.Text IO ()
 hPutBytes (PlainHandle h)  = liftIO . B.hPut h
 hPutBytes (SecureHandle _ s) = liftTLS s . TLS.putBytes
 
-hGetChar :: Handle -> ErrorT T.Text IO Char
-hGetChar (PlainHandle h) = liftIO $ IO.hGetChar h
-hGetChar (SecureHandle h s) = do
-	bytes <- liftTLS s $ do
-		pending <- TLS.checkPending
-		when (pending == 0) $ do
-			liftIO $ IO.hWaitForInput h (- 1)
-			return ()
-		
-		TLS.getBytes 1
-	case B.unpack bytes of
-		(c:_) -> return c
-		_ -> E.throwError "hGetChar: not enough bytes"
+hGetBytes :: Handle -> Integer -> ErrorT T.Text IO B.ByteString
+hGetBytes (PlainHandle h) n = liftIO $  B.hGet h $ fromInteger n
+hGetBytes (SecureHandle h s) n = liftTLS s $ do
+	pending <- TLS.checkPending
+	when (pending == 0) $ do
+		liftIO $ IO.hWaitForInput h (- 1)
+		return ()
+	
+	TLS.getBytes n

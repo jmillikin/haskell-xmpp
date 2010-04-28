@@ -26,6 +26,7 @@ import qualified Control.Monad.Error as E
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Lazy as TL
 import Data.Typeable (Typeable)
 
 import Text.XML.HXT.Arrow ((>>>))
@@ -41,7 +42,7 @@ import Network.Protocol.XMPP.XML (element, qname)
 data Result = Success | Failure
 	deriving (Show, Eq)
 
-data AuthException = XmppError M.Error | SaslError T.Text
+data AuthException = XmppError M.Error | SaslError TL.Text
 	deriving (Typeable, Show)
 
 instance Exc.Exception AuthException
@@ -49,14 +50,14 @@ instance Exc.Exception AuthException
 authenticate :: [B.ByteString] -- ^ Mechanisms
              -> JID -- ^ User JID
              -> JID -- ^ Server JID
-             -> T.Text -- ^ Username
-             -> T.Text -- ^ Password
+             -> TL.Text -- ^ Username
+             -> TL.Text -- ^ Password
              -> M.XMPP ()
 authenticate xmppMechanisms userJID serverJID username password = xmpp where
 	mechanisms = map SASL.Mechanism xmppMechanisms
 	authz = formatJID $ userJID { jidResource = Nothing }
 	hostname = formatJID serverJID
-	utf8 = TE.encodeUtf8
+	utf8 = TE.encodeUtf8 . T.concat . TL.toChunks
 	
 	xmpp = do
 		ctx <- M.getContext
@@ -92,7 +93,7 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 			
 		case sessionResult of
 			Right x -> return x
-			Left err -> saslError $ T.pack $ show err
+			Left err -> saslError $ TL.pack $ show err
 
 saslLoop :: M.Context -> SASL.Session Result
 saslLoop ctx = do
@@ -134,5 +135,5 @@ getTree ctx = do
 		Left err -> Exc.throwIO $ XmppError err
 		Right x -> return x
 
-saslError :: MonadIO m => T.Text -> m a
+saslError :: MonadIO m => TL.Text -> m a
 saslError = liftIO . Exc.throwIO . SaslError

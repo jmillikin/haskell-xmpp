@@ -22,8 +22,8 @@ module Network.Protocol.XMPP.Connections
 	) where
 import Network (HostName, PortID)
 import qualified Data.ByteString.Lazy as B
-import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
+import qualified Data.Text.Lazy as T
+import Data.Text.Lazy.Encoding (encodeUtf8)
 import qualified Text.XML.HXT.DOM.Interface as DOM
 import qualified Text.XML.LibXML.SAX as SAX
 
@@ -40,7 +40,7 @@ data Server = Server
 -- serialization cannot be used. Be careful to escape any embedded
 -- attributes.
 xmlHeader :: T.Text -> JID -> B.ByteString
-xmlHeader ns jid = B.fromChunks [encodeUtf8 header] where
+xmlHeader ns jid = encodeUtf8 header where
 	escape = T.pack . DOM.attrEscapeXml . T.unpack
 	attr x = T.concat ["\"", escape x, "\""]
 	header = T.concat

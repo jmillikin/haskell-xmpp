@@ -25,7 +25,7 @@ import Control.Monad (when)
 import qualified Control.Monad.Error as E
 import Control.Monad.Trans (liftIO)
 import qualified Data.ByteString.Lazy.Char8 as B
-import qualified Data.Text as T
+import qualified Data.Text.Lazy as T
 import qualified System.IO as IO
 import qualified Network.Protocol.TLS.GNU as TLS
 import Network.Protocol.XMPP.ErrorT

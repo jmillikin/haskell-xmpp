@@ -31,7 +31,7 @@ module Network.Protocol.XMPP.Stanza
 	, treeToStanza
 	) where
 
-import qualified Data.Text as T
+import qualified Data.Text.Lazy as T
 import Text.XML.HXT.DOM.Interface (XmlTree)
 import Text.XML.HXT.Arrow ((>>>))
 import qualified Text.XML.HXT.Arrow as A

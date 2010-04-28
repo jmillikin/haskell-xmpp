@@ -23,8 +23,9 @@ import Control.Monad.Error (throwError)
 import Data.Bits (shiftR, (.&.))
 import Data.Char (intToDigit)
 import qualified Data.ByteString as B
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy.Encoding as TE
 import Network (connectTo)
 import Text.XML.HXT.Arrow ((>>>))
 import qualified Text.XML.HXT.Arrow as A
@@ -87,11 +88,9 @@ authenticate streamID password = do
 		throwError M.ComponentHandshakeFailed
 
 buildSecret :: T.Text -> T.Text -> B.ByteString
-buildSecret sid password = bytes where
-	bytes = TE.encodeUtf8 $ T.pack escaped
-	escaped = DOM.attrEscapeXml $ sid' ++ password'
-	sid' = T.unpack sid
-	password' = T.unpack password
+buildSecret sid password = B.concat . BL.toChunks $ bytes where
+	escape = T.pack . DOM.attrEscapeXml . T.unpack
+	bytes = TE.encodeUtf8 $ escape $ T.append sid password
 
 showDigest :: B.ByteString -> String
 showDigest = concatMap wordToHex . B.unpack where

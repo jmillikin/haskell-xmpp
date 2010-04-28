@@ -20,14 +20,10 @@ module Network.Protocol.XMPP.Client
 	) where
 import Control.Monad.Error (throwError)
 import Control.Monad.Trans (liftIO)
-import Network (connectTo)
-import Text.XML.HXT.Arrow ((>>>))
-import qualified Text.XML.HXT.Arrow as A
-import qualified Text.XML.HXT.DOM.Interface as DOM
-import qualified Text.XML.HXT.DOM.XmlNode as XN
-import qualified System.IO as IO
 import Data.ByteString (ByteString)
 import qualified Data.Text.Lazy as T
+import Network (connectTo)
+import qualified System.IO as IO
 
 import qualified Network.Protocol.XMPP.Client.Authentication as A
 import qualified Network.Protocol.XMPP.Connections as C
@@ -35,7 +31,7 @@ import qualified Network.Protocol.XMPP.Client.Features as F
 import qualified Network.Protocol.XMPP.Handle as H
 import qualified Network.Protocol.XMPP.JID as J
 import qualified Network.Protocol.XMPP.Monad as M
-import Network.Protocol.XMPP.XML (element, qname)
+import qualified Network.Protocol.XMPP.XML as X
 import Network.Protocol.XMPP.ErrorT
 import Network.Protocol.XMPP.Stanza
 
@@ -64,14 +60,14 @@ newStream :: J.JID -> M.XMPP [F.Feature]
 newStream jid = do
 	M.putBytes $ C.xmlHeader "jabber:client" jid
 	M.readEvents C.startOfStream
-	F.parseFeatures `fmap` M.getTree
+	F.parseFeatures `fmap` M.getElement
 
 tryTLS :: J.JID -> [F.Feature] -> ([F.Feature] -> M.XMPP a) -> M.XMPP a
 tryTLS sjid features m
 	| not (streamSupportsTLS features) = m features
 	| otherwise = do
-		M.putTree xmlStartTLS
-		M.getTree
+		M.putElement xmlStartTLS
+		M.getElement
 		h <- M.getHandle
 		eitherTLS <- liftIO $ runErrorT $ H.startTLS h
 		case eitherTLS of
@@ -90,11 +86,11 @@ bindJID jid = do
 	-- Bind
 	M.putStanza . bindStanza . J.jidResource $ jid
 	bindResult <- M.getStanza
-	
-	let jidArrow =
-		A.deep (A.hasQName (qname "urn:ietf:params:xml:ns:xmpp-bind" "jid"))
-		>>> A.getChildren
-		>>> A.getText
+	let getJID e =
+		X.elementChildren e
+		>>= X.hasName (X.Name "jid" (Just "urn:ietf:params:xml:ns:xmpp-bind") Nothing)
+		>>= X.elementNodes
+		>>= X.getText
 	
 	let maybeJID = do
 		iq <- case bindResult of
@@ -102,9 +98,9 @@ bindJID jid = do
 			_ -> Nothing
 		payload <- iqPayload iq
 		
-		case A.runLA jidArrow payload of
+		case getJID payload of
 			[] -> Nothing
-			(str:_) -> J.parseJID (T.pack str)
+			(str:_) -> J.parseJID str
 	
 	returnedJID <- case maybeJID of
 		Just x -> return x
@@ -121,27 +117,19 @@ bindJID jid = do
 
 bindStanza :: Maybe J.Resource -> IQ
 bindStanza resource = (emptyIQ IQSet) { iqPayload = Just payload } where
-	payload = element ("", "bind")
-		[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-bind")]
-		requested
+	payload = X.nselement "urn:ietf:params:xml:ns:xmpp-bind" "bind" [] requested
 	requested = case fmap J.strResource resource of
 		Nothing -> []
-		Just x -> [element ("", "resource")
-			[]
-			[XN.mkText (T.unpack x)]]
+		Just x -> [X.NodeElement $ X.element "resource" [] [X.NodeText x]]
 
 sessionStanza :: IQ
 sessionStanza = (emptyIQ IQSet) { iqPayload = Just payload } where
-	payload = element ("", "session")
-		[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-session")]
-		[]
+	payload = X.nselement "urn:ietf:params:xml:ns:xmpp-session" "session" [] []
 
 streamSupportsTLS :: [F.Feature] -> Bool
 streamSupportsTLS = any isStartTLS where
 	isStartTLS (F.FeatureStartTLS _) = True
 	isStartTLS _                     = False
 
-xmlStartTLS :: DOM.XmlTree
-xmlStartTLS = element ("", "starttls")
-	[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-tls")]
-	[]
+xmlStartTLS :: X.Element
+xmlStartTLS = X.nselement "urn:ietf:params:xml:ns:xmpp-tls" "starttls" [] []

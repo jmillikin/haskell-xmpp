@@ -1,4 +1,4 @@
--- Copyright (C) 2009-2010 John Millikin <jmillikin@gmail.com>
+-- Copyright (C) 2010 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -13,32 +13,94 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.XML
-	( readEvents
-	, eventsToTree
-	, convertQName
+	( module Data.XML.Types
+	, elementChildren
+	, hasName
+	, getattr
+	, getText
+	, name
+	, nsname
 	, element
-	, attr
-	, qname
+	, nselement
+	, escape
+	, serialiseElement
+	, readEvents
+	, SAX.eventsToElement
 	) where
-import Control.Monad.Trans (MonadIO, liftIO)
-import qualified Data.ByteString.Char8 as C8
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
-
--- XML Parsing
-import Text.XML.HXT.Arrow ((>>>))
-import qualified Text.XML.HXT.Arrow as A
-import qualified Text.XML.HXT.DOM.Interface as DOM
-import qualified Text.XML.HXT.DOM.XmlNode as XN
+import qualified Data.Text.Lazy as T
+import Data.XML.Types
 import qualified Text.XML.LibXML.SAX as SAX
 
-readEvents :: MonadIO m => (Integer -> SAX.Event -> Bool) -> m String -> SAX.Parser -> m [SAX.Event]
-readEvents done getChars parser = readEvents' 0 [] where
-	nextEvents = do
-		chars <- getChars
-		liftIO $ SAX.parse parser chars False
+elementChildren :: Element -> [Element]
+elementChildren = concatMap isElement . elementNodes
+
+hasName :: Name -> Element -> [Element]
+hasName n e = [e | elementName e == n]
+
+isElement :: Node -> [Element]
+isElement (NodeElement e) = [e]
+isElement _ = []
+
+getattr :: Name -> Element -> Maybe T.Text
+getattr attrname elemt = case filter ((attrname ==) . attributeName) $ elementAttributes elemt of
+	[] -> Nothing
+	attr:_ -> Just $ attributeValue attr
+
+getText :: Node -> [T.Text]
+getText (NodeText t) = [t]
+getText _ = []
+
+name :: T.Text -> Name
+name t = Name t Nothing Nothing
+
+nsname :: T.Text -> T.Text -> Name
+nsname ns n = Name n (Just ns) Nothing
+
+escape :: T.Text -> T.Text
+escape = T.concatMap escapeChar where
+	escapeChar c = case c of
+		'&' -> "&amp;"
+		'<' -> "&lt;"
+		'>' -> "&gt;"
+		'"' -> "&quot;"
+		'\'' -> "&apos;"
+		_ -> T.singleton c
+
+element :: T.Text -> [(T.Text, T.Text)] -> [Node] -> Element
+element elemName attrs children = Element (name elemName) attrs' children where
+	attrs' = [Attribute (name n) value | (n, value) <- attrs]
+
+nselement :: T.Text -> T.Text -> [(T.Text, T.Text)] -> [Node] -> Element
+nselement ns ln attrs children = Element (nsname ns ln) attrs' children where
+	attrs' = [Attribute (name n) value | (n, value) <- attrs]
+
+-- A somewhat primitive serialisation function
+--
+-- TODO: better namespace / prefix handling
+serialiseElement :: Element -> T.Text
+serialiseElement e = text where
+	text = T.concat ["<", eName, " ", attrs, ">", contents, "</", eName, ">"]
+	eName = formatName $ elementName e
+	formatName = escape . nameLocalName
+	attrs = T.intercalate " " $ map attr $ elementAttributes e ++ nsattr
+	attr (Attribute n v) = T.concat [formatName n, "=\"", escape v, "\""]
+	nsattr = case nameNamespace $ elementName e of
+		Nothing -> []
+		Just ns -> [Attribute (name "xmlns") ns]
+	contents = T.concat $ map serialiseNode $ elementNodes e
 	
+	serialiseNode (NodeElement e') = serialiseElement e'
+	serialiseNode (NodeText t) = escape t
+	serialiseNode (NodeComment _) = ""
+	serialiseNode (NodeInstruction _) = ""
+
+readEvents :: Monad m
+           => (Integer -> SAX.Event -> Bool)
+           -> m [SAX.Event]
+           -> m [SAX.Event]
+readEvents done nextEvents = readEvents' 0 [] where
 	readEvents' depth acc = do
 		events <- nextEvents
 		let (done', depth', acc') = step events depth acc
@@ -46,7 +108,7 @@ readEvents done getChars parser = readEvents' 0 [] where
 			then return acc'
 			else readEvents' depth' acc'
 	
-	step []     depth acc = (False, depth, acc)
+	step [] depth acc = (False, depth, acc)
 	step (e:es) depth acc = let
 		depth' = depth + case e of
 			(SAX.BeginElement _ _) -> 1
@@ -56,75 +118,3 @@ readEvents done getChars parser = readEvents' 0 [] where
 		in if done depth' e
 			then (True, depth', reverse acc')
 			else step es depth' acc'
-
--------------------------------------------------------------------------------
--- For converting incremental XML event lists to HXT trees
--------------------------------------------------------------------------------
-
--- This function assumes the input list is valid. No validation is performed.
-eventsToTree :: [SAX.Event] -> DOM.XmlTree
-eventsToTree = XN.mkRoot [] . eventsToTrees
-
-eventsToTrees :: [SAX.Event] -> [DOM.XmlTree]
-eventsToTrees = concatMap blockToTrees . splitBlocks
-
--- Split event list into a sequence of "blocks", which are the events including
--- and between a pair of tags. <start><start2/></start> and <start/> are both
--- single blocks.
-splitBlocks :: [SAX.Event] -> [[SAX.Event]]
-splitBlocks es = ret where (_, _, ret) = foldl splitBlocks' (0, [], []) es
-
-splitBlocks' :: (Int, [SAX.Event], [[SAX.Event]])
-                -> SAX.Event
-                -> (Int, [SAX.Event], [[SAX.Event]])
-splitBlocks' (depth, accum, allAccum) e =
-	if depth' == 0 then
-		(depth', [], allAccum ++ [accum'])
-	else
-		(depth', accum', allAccum)
-	where
-		accum' = accum ++ [e]
-		depth' = depth + case e of
-			(SAX.BeginElement _ _) -> 1
-			(SAX.EndElement _) -> (- 1)
-			_ -> 0
-
-blockToTrees :: [SAX.Event] -> [DOM.XmlTree]
-blockToTrees [] = []
-blockToTrees (begin:rest) = let end = (last rest) in case (begin, end) of
-	(SAX.BeginElement qname' attrs, SAX.EndElement _) ->
-		[XN.mkElement (convertQName qname')
-			(map convertAttr attrs)
-			(eventsToTrees (init rest))]
-	(SAX.Characters s, _) -> [XN.mkText $ utf8 s]
-	(_, SAX.ParseError text) -> error text
-	_ -> []
-
-convertAttr :: SAX.Attribute -> DOM.XmlTree
-convertAttr (SAX.Attribute qname' value) = XN.NTree
-	(XN.mkAttrNode (convertQName qname'))
-	[XN.mkText $ utf8 value]
-
-convertQName :: SAX.QName -> DOM.QName
-convertQName (SAX.QName ns _ local) = qname (utf8 ns) (utf8 local)
-
--------------------------------------------------------------------------------
--- Utility functions for building XML trees
--------------------------------------------------------------------------------
-
-element :: (String, String) -> [(String, String, String)] -> [DOM.XmlTree] -> DOM.XmlTree
-element (ns, localpart) attrs children = let
-	qname' = qname ns localpart
-	attrs' = [attr ans alp text | (ans, alp, text) <- attrs]
-	in XN.mkElement qname' attrs' children
-
-attr :: String -> String -> String -> DOM.XmlTree
-attr ns localpart text = XN.mkAttr (qname ns localpart) [XN.mkText text]
-
-qname :: String -> String -> DOM.QName
-qname ns localpart = case ns of
-	"" -> DOM.mkName localpart
-	_ -> DOM.mkNsName localpart ns
-
-utf8 :: String -> String
-utf8 = T.unpack . TE.decodeUtf8 . C8.pack

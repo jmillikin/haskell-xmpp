@@ -14,6 +14,7 @@
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.Monad
 	( XMPP (..)
 	, Error (..)
@@ -26,11 +27,11 @@ module Network.Protocol.XMPP.Monad
 	, getContext
 	
 	, readEvents
-	, getTree
+	, getElement
 	, getStanza
 	
 	, putBytes
-	, putTree
+	, putElement
 	, putStanza
 	) where
 import Control.Monad.Trans (MonadIO, liftIO)
@@ -38,11 +39,8 @@ import qualified Control.Monad.Error as E
 import qualified Control.Monad.Reader as R
 import qualified Data.ByteString.Lazy.Char8 as B
 import Data.Text.Lazy (Text)
-
-import Text.XML.HXT.Arrow ((>>>))
-import qualified Text.XML.HXT.Arrow as A
-import qualified Text.XML.HXT.DOM.Interface as DOM
-import qualified Text.XML.HXT.DOM.XmlNode as XN
+import Data.Text.Lazy.Encoding (encodeUtf8)
+import qualified Data.FailableList as FL
 import qualified Text.XML.LibXML.SAX as SAX
 
 import Network.Protocol.XMPP.ErrorT
@@ -51,11 +49,12 @@ import qualified Network.Protocol.XMPP.Stanza as S
 import qualified Network.Protocol.XMPP.XML as X
 
 data Error
-	= InvalidStanza DOM.XmlTree
+	= InvalidStanza X.Element
 	| InvalidBindResult S.ReceivedStanza
 	| AuthenticationFailure
 	| AuthenticationError Text
 	| TransportError Text
+	| MarkupError Text
 	| NoComponentStreamID
 	| ComponentHandshakeFailed
 	deriving (Show)
@@ -84,13 +83,13 @@ runXMPP ctx xmpp = R.runReaderT (runErrorT (unXMPP xmpp)) ctx
 
 startXMPP :: H.Handle -> Text -> XMPP a -> IO (Either Error a)
 startXMPP h ns xmpp = do
-	sax <- SAX.mkParser
+	sax <- SAX.newParser
 	runXMPP (Context h ns sax) xmpp
 
 restartXMPP :: Maybe H.Handle -> XMPP a -> XMPP a
 restartXMPP newH xmpp = do
 	Context oldH ns _ <- getContext
-	sax <- liftIO $ SAX.mkParser
+	sax <- liftIO SAX.newParser
 	let ctx = Context (maybe oldH id newH) ns sax
 	XMPP $ R.local (const ctx) (unXMPP xmpp)
 
@@ -114,35 +113,45 @@ putBytes bytes = do
 	h <- getHandle
 	liftTLS $ H.hPutBytes h bytes
 
-putTree :: DOM.XmlTree -> XMPP ()
-putTree t = do
-	let root = XN.mkRoot [] [t]
-	[text] <- liftIO $ A.runX (A.constA root >>> A.writeDocumentToString [
-		(A.a_no_xml_pi, "1")
-		])
-	putBytes $ B.pack text
+putElement :: X.Element -> XMPP ()
+putElement = putBytes . encodeUtf8 . X.serialiseElement
 
 putStanza :: S.Stanza a => a -> XMPP ()
-putStanza = putTree . S.stanzaToTree
+putStanza = putElement . S.stanzaToElement
 
 readEvents :: (Integer -> SAX.Event -> Bool) -> XMPP [SAX.Event]
-readEvents done = do
-	Context h _ p <- getContext
-	let nextChar = do
-		-- TODO: read in larger increments
-		bytes <- liftTLS $ H.hGetBytes h 1
-		return $ B.unpack bytes
-	X.readEvents done nextChar p
+readEvents done = xmpp where
+	xmpp = do
+		Context h _ p <- getContext
+		let nextEvents = do
+			-- TODO: read in larger increments
+			bytes <- liftTLS $ H.hGetBytes h 1
+			failable <- liftIO $ SAX.parse p bytes False
+			failableToList failable
+		X.readEvents done nextEvents
+	
+	failableToList f = case f of
+		FL.Fail (SAX.Error e) -> E.throwError $ MarkupError e
+		FL.Done -> return []
+		FL.Next e es -> do
+			es' <- failableToList es
+			return $ e : es'
 
-getTree :: XMPP DOM.XmlTree
-getTree = X.eventsToTree `fmap` readEvents endOfTree where
+getElement :: XMPP X.Element
+getElement = xmpp where
+	xmpp = do
+		events <- readEvents endOfTree
+		case X.eventsToElement events of
+			Just x -> return x
+			Nothing -> E.throwError $ MarkupError "getElement: invalid event list"
+	
 	endOfTree 0 (SAX.EndElement _) = True
 	endOfTree _ _ = False
 
 getStanza :: XMPP S.ReceivedStanza
 getStanza = do
-	tree <- getTree
+	elemt <- getElement
 	Context _ ns _ <- getContext
-	case S.treeToStanza ns tree of
+	case S.elementToStanza ns elemt of
 		Just x -> return x
-		Nothing -> E.throwError $ InvalidStanza tree
+		Nothing -> E.throwError $ InvalidStanza elemt

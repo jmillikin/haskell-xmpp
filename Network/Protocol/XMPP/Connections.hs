@@ -24,11 +24,10 @@ import Network (HostName, PortID)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Text.Lazy as T
 import Data.Text.Lazy.Encoding (encodeUtf8)
-import qualified Text.XML.HXT.DOM.Interface as DOM
 import qualified Text.XML.LibXML.SAX as SAX
 
+import qualified Network.Protocol.XMPP.XML as X
 import Network.Protocol.XMPP.JID (JID, formatJID)
-import Network.Protocol.XMPP.XML (qname, convertQName)
 
 data Server = Server
 	{ serverJID      :: JID
@@ -41,8 +40,7 @@ data Server = Server
 -- attributes.
 xmlHeader :: T.Text -> JID -> B.ByteString
 xmlHeader ns jid = encodeUtf8 header where
-	escape = T.pack . DOM.attrEscapeXml . T.unpack
-	attr x = T.concat ["\"", escape x, "\""]
+	attr x = T.concat ["\"", X.escape x, "\""]
 	header = T.concat
 		[ "<?xml version='1.0'?>\n"
 		, "<stream:stream xmlns=" , attr ns
@@ -53,9 +51,8 @@ xmlHeader ns jid = encodeUtf8 header where
 
 startOfStream :: Integer -> SAX.Event -> Bool
 startOfStream depth event = case (depth, event) of
-	(1, (SAX.BeginElement elemName _)) ->
-		qnameStream == convertQName elemName
+	(1, (SAX.BeginElement elemName _)) -> qnameStream == elemName
 	_ -> False
 
-qnameStream :: DOM.QName
-qnameStream = qname "http://etherx.jabber.org/streams" "stream"
+qnameStream :: X.Name
+qnameStream = X.Name "stream" (Just "http://etherx.jabber.org/streams") Nothing

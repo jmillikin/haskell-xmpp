@@ -28,16 +28,11 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Lazy as TL
 import Data.Typeable (Typeable)
-
-import Text.XML.HXT.Arrow ((>>>))
-import qualified Text.XML.HXT.Arrow as A
-import qualified Text.XML.HXT.DOM.XmlNode as XN
-import Text.XML.HXT.DOM.Interface (XmlTree)
 import qualified Network.Protocol.SASL.GNU as SASL
 
 import qualified Network.Protocol.XMPP.Monad as M
+import qualified Network.Protocol.XMPP.XML as X
 import Network.Protocol.XMPP.JID (JID, formatJID, jidResource)
-import Network.Protocol.XMPP.XML (element, qname)
 
 data Result = Success | Failure
 	deriving (Show, Eq)
@@ -68,7 +63,7 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 				Just mechanism -> authSasl ctx mechanism
 		case res of
 			Right Success -> return ()
-			Right Failure -> E.throwError $ M.AuthenticationFailure
+			Right Failure -> E.throwError M.AuthenticationFailure
 			Left (XmppError err) -> E.throwError err
 			Left (SaslError err) -> E.throwError $ M.AuthenticationError err
 	
@@ -82,10 +77,9 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 			SASL.setProperty SASL.PropertyHostname $ utf8 hostname
 			
 			(b64text, rc) <- SASL.step64 $ B.pack ""
-			putTree ctx $ element ("", "auth")
-				[ ("", "xmlns", "urn:ietf:params:xml:ns:xmpp-sasl")
-				, ("", "mechanism", B.unpack mechBytes)]
-				[XN.mkText $ B.unpack b64text]
+			putElement ctx $ X.nselement "urn:ietf:params:xml:ns:xmpp-sasl" "auth"
+				[("mechanism", TL.pack $ B.unpack mechBytes)]
+				[X.NodeText $ TL.pack $ B.unpack b64text]
 			
 			case rc of
 				SASL.Complete -> saslFinish ctx
@@ -97,40 +91,39 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 
 saslLoop :: M.Context -> SASL.Session Result
 saslLoop ctx = do
-	challengeText <- liftIO $ A.runX (
-		A.arrIO (\_ -> getTree ctx)
-		>>> A.getChildren
-		>>> A.hasQName (qname "urn:ietf:params:xml:ns:xmpp-sasl" "challenge")
-		>>> A.getChildren >>> A.getText)
+	elemt <- getElement ctx
+	let challengeText =
+		return elemt
+		>>= X.hasName (X.Name "challenge" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing)
+		>>= X.elementNodes
+		>>= X.getText
 	when (null challengeText) $ saslError "Received empty challenge"
 	
-	(b64text, rc) <- SASL.step64 $ B.pack $ concat challengeText
-	putTree ctx $ element ("", "response")
-		[("", "xmlns", "urn:ietf:params:xml:ns:xmpp-sasl")]
-		[XN.mkText $ B.unpack b64text]
+	(b64text, rc) <- SASL.step64 . B.pack . concatMap TL.unpack $ challengeText
+	putElement ctx $ X.nselement "urn:ietf:params:xml:ns:xmpp-sasl" "response"
+		[] [X.NodeText $ TL.pack $ B.unpack b64text]
 	case rc of
 		SASL.Complete -> saslFinish ctx
 		SASL.NeedsMore -> saslLoop ctx
 
 saslFinish :: M.Context -> SASL.Session Result
-saslFinish ctx = liftIO $ do
-	successElem <- A.runX (
-		A.arrIO (\_ -> getTree ctx)
-		>>> A.getChildren
-		>>> A.hasQName (qname "urn:ietf:params:xml:ns:xmpp-sasl" "success"))
-	
-	return $ if null successElem then Failure else Success
+saslFinish ctx = do
+	elemt <- getElement ctx
+	let success =
+		return elemt
+		>>= X.hasName (X.Name "success" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing)
+	return $ if null success then Failure else Success
 
-putTree :: M.Context -> XmlTree -> SASL.Session ()
-putTree ctx tree = liftIO $ do
-	res <- M.runXMPP ctx $ M.putTree tree
+putElement :: M.Context -> X.Element -> SASL.Session ()
+putElement ctx elemt = liftIO $ do
+	res <- M.runXMPP ctx $ M.putElement elemt
 	case res of
 		Left err -> Exc.throwIO $ XmppError err
 		Right x -> return x
 
-getTree :: M.Context -> IO XmlTree
-getTree ctx = do
-	res <- M.runXMPP ctx $ M.getTree
+getElement :: M.Context -> SASL.Session X.Element
+getElement ctx = liftIO $ do
+	res <- M.runXMPP ctx M.getElement
 	case res of
 		Left err -> Exc.throwIO $ XmppError err
 		Right x -> return x

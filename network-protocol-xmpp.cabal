@@ -23,14 +23,15 @@ library
       base >=3 && < 5
     , text >= 0.7 && < 0.8
     , gnuidn >= 0.1 && < 0.2
-    , hxt >= 8.5 && < 8.6
     , gnutls >= 0.1 && < 0.3
     , bytestring >= 0.9 && < 0.10
-    , libxml-sax >= 0.3 && < 0.4
+    , libxml-sax >= 0.4 && < 0.5
     , gsasl >= 0.3 && < 0.4
     , network >= 2.2 && < 2.3
     , transformers >= 0.2 && < 0.3
     , monads-tf >= 0.1 && < 0.2
+    , xml-types >= 0.1 && < 0.2
+    , failable-list >= 0.2 && < 0.3
 
   exposed-modules:
     Network.Protocol.XMPP

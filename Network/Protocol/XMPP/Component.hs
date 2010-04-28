@@ -27,10 +27,6 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Encoding as TE
 import Network (connectTo)
-import Text.XML.HXT.Arrow ((>>>))
-import qualified Text.XML.HXT.Arrow as A
-import qualified Text.XML.HXT.DOM.Interface as DOM
-import qualified Text.XML.HXT.DOM.XmlNode as XN
 import Network.Protocol.SASL.GNU (sha1)
 import qualified System.IO as IO
 import qualified Text.XML.LibXML.SAX as SAX
@@ -38,7 +34,7 @@ import qualified Text.XML.LibXML.SAX as SAX
 import qualified Network.Protocol.XMPP.Connections as C
 import qualified Network.Protocol.XMPP.Handle as H
 import qualified Network.Protocol.XMPP.Monad as M
-import Network.Protocol.XMPP.XML (element, qname)
+import qualified Network.Protocol.XMPP.XML as X
 import Network.Protocol.XMPP.JID (JID)
 
 runComponent :: C.Server
@@ -66,33 +62,27 @@ beginStream jid = do
 parseStreamID :: SAX.Event -> Maybe T.Text
 parseStreamID (SAX.BeginElement _ attrs) = sid where
 	sid = case idAttrs of
-		(x:_) -> Just . T.pack . SAX.attributeValue $ x
+		(x:_) -> Just . X.attributeValue $ x
 		_ -> Nothing
-	idAttrs = filter (matchingName . SAX.attributeName) attrs
-	matchingName n = and
-		[ SAX.qnameNamespace n == "jabber:component:accept"
-		, SAX.qnameLocalName n == "id"
-		]
+	idAttrs = filter (matchingName . X.attributeName) attrs
+	matchingName = (== X.Name "jid" (Just "jabber:component:accept") Nothing)
 parseStreamID _ = Nothing
 
 authenticate :: T.Text -> T.Text -> M.XMPP ()
 authenticate streamID password = do
 	let bytes = buildSecret streamID password
 	let digest = showDigest $ sha1 bytes
-	M.putTree $ element ("", "handshake") [] [XN.mkText digest]
-	result <- M.getTree
-	let accepted = A.runLA $
-		A.getChildren
-		>>> A.hasQName (qname "jabber:component:accept" "handshake")
-	when (null (accepted result)) $
+	M.putElement $ X.element "handshake" [] [X.NodeText digest]
+	result <- M.getElement
+	let nameHandshake = X.Name "handshake" (Just "jabber:component:accept") Nothing
+	when (null (X.hasName nameHandshake result)) $
 		throwError M.ComponentHandshakeFailed
 
 buildSecret :: T.Text -> T.Text -> B.ByteString
 buildSecret sid password = B.concat . BL.toChunks $ bytes where
-	escape = T.pack . DOM.attrEscapeXml . T.unpack
-	bytes = TE.encodeUtf8 $ escape $ T.append sid password
+	bytes = TE.encodeUtf8 $ X.escape $ T.append sid password
 
-showDigest :: B.ByteString -> String
-showDigest = concatMap wordToHex . B.unpack where
+showDigest :: B.ByteString -> T.Text
+showDigest = T.pack . concatMap wordToHex . B.unpack where
 	wordToHex x = [hexDig $ shiftR x 4, hexDig $ x .&. 0xF]
 	hexDig = intToDigit . fromIntegral

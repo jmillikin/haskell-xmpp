@@ -13,17 +13,16 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.Client.Features
 	( Feature (..)
 	, parseFeatures
 	, parseFeature
 	) where
+import Control.Arrow ((&&&))
 import qualified Data.ByteString.Char8 as B
-import Text.XML.HXT.Arrow ((>>>), (&&&))
-import qualified Text.XML.HXT.Arrow as A
-import qualified Text.XML.HXT.DOM.Interface as DOM
-import qualified Text.XML.HXT.DOM.XmlNode as XN
-import Network.Protocol.XMPP.XML (qname)
+import qualified Data.Text.Lazy as TL
+import qualified Network.Protocol.XMPP.XML as X
 
 data Feature =
 	  FeatureStartTLS Bool
@@ -31,40 +30,39 @@ data Feature =
 	| FeatureRegister
 	| FeatureBind
 	| FeatureSession
-	| FeatureUnknown DOM.XmlTree
+	| FeatureUnknown X.Element
 	deriving (Show, Eq)
 
-parseFeatures :: DOM.XmlTree -> [Feature]
-parseFeatures = A.runLA $
-	A.getChildren
-	>>> A.hasQName qnameFeatures
-	>>> A.getChildren
-	>>> A.arrL (\t' -> [parseFeature t'])
+parseFeatures :: X.Element -> [Feature]
+parseFeatures elemt =
+	X.hasName nameFeatures elemt
+	>>= X.elementChildren
+	>>= return . parseFeature
 
-parseFeature :: DOM.XmlTree -> Feature
-parseFeature t = feature where
-	mkPair = maybe ("", "") $ DOM.namespaceUri &&& DOM.localPart
-	feature = case mkPair (XN.getName t) of
-		("urn:ietf:params:xml:ns:xmpp-tls", "starttls") -> parseFeatureTLS t
-		("urn:ietf:params:xml:ns:xmpp-sasl", "mechanisms") -> parseFeatureSASL t
+parseFeature :: X.Element -> Feature
+parseFeature elemt = feature where
+	unpackName = (maybe "" id . X.nameNamespace) &&& X.nameLocalName
+	feature = case unpackName (X.elementName elemt) of
+		("urn:ietf:params:xml:ns:xmpp-tls", "starttls") -> parseFeatureTLS elemt
+		("urn:ietf:params:xml:ns:xmpp-sasl", "mechanisms") -> parseFeatureSASL elemt
 		("http://jabber.org/features/iq-register", "register") -> FeatureRegister
 		("urn:ietf:params:xml:ns:xmpp-bind", "bind") -> FeatureBind
 		("urn:ietf:params:xml:ns:xmpp-session", "session") -> FeatureSession
-		_ -> FeatureUnknown t
+		_ -> FeatureUnknown elemt
 
-parseFeatureTLS :: DOM.XmlTree -> Feature
-parseFeatureTLS t = FeatureStartTLS True -- TODO: detect whether or not required
+parseFeatureTLS :: X.Element -> Feature
+parseFeatureTLS _ = FeatureStartTLS True -- TODO: detect whether or not required
 
-parseFeatureSASL :: DOM.XmlTree -> Feature
-parseFeatureSASL = FeatureSASL . A.runLA (
-	A.getChildren
-	>>> A.hasQName qnameMechanism
-	>>> A.getChildren
-	>>> A.getText
-	>>> A.arr B.pack)
+parseFeatureSASL :: X.Element -> Feature
+parseFeatureSASL e = FeatureSASL $
+	X.elementChildren e
+	>>= X.hasName nameMechanism
+	>>= X.elementNodes
+	>>= X.getText
+	>>= return . B.pack . TL.unpack
 
-qnameMechanism :: DOM.QName
-qnameMechanism = qname "urn:ietf:params:xml:ns:xmpp-sasl" "mechanism"
+nameMechanism :: X.Name
+nameMechanism = X.Name "mechanism" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing
 
-qnameFeatures :: DOM.QName
-qnameFeatures = qname "http://etherx.jabber.org/streams" "features"
+nameFeatures :: X.Name
+nameFeatures = X.Name "features" (Just "http://etherx.jabber.org/streams") Nothing

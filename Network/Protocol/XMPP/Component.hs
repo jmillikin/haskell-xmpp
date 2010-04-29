@@ -38,7 +38,7 @@ import qualified Network.Protocol.XMPP.XML as X
 import Network.Protocol.XMPP.JID (JID)
 
 runComponent :: C.Server
-             -> T.Text -- ^ Password
+             -> T.Text -- ^ Server secret
              -> M.XMPP a
              -> IO (Either M.Error a)
 runComponent server password xmpp = do
@@ -76,7 +76,7 @@ authenticate streamID password = do
 	result <- M.getElement
 	let nameHandshake = X.Name "handshake" (Just "jabber:component:accept") Nothing
 	when (null (X.hasName nameHandshake result)) $
-		throwError M.ComponentHandshakeFailed
+		throwError M.AuthenticationFailure
 
 buildSecret :: T.Text -> T.Text -> B.ByteString
 buildSecret sid password = B.concat . BL.toChunks $ bytes where

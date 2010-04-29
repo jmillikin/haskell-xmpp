@@ -52,14 +52,25 @@ import qualified Network.Protocol.XMPP.Stanza as S
 import qualified Network.Protocol.XMPP.XML as X
 
 data Error
-	= InvalidStanza X.Element
-	| InvalidBindResult S.ReceivedStanza
-	| AuthenticationFailure
+	-- | The remote host refused the specified authentication credentials.
+	= AuthenticationFailure
+	
+	-- | There was an error while authenticating with the remote host.
 	| AuthenticationError Text
+	
+	-- | An unrecognized or malformed 'S.Stanza' was received from the remote
+	-- host.
+	| InvalidStanza X.Element
+	
+	-- | The remote host sent an invalid reply to a resource bind request.
+	| InvalidBindResult S.ReceivedStanza
+	
+	-- | There was an error with the underlying transport.
 	| TransportError Text
-	| MarkupError Text
+	
+	-- | The remote host did not send a stream ID when accepting a component
+	-- connection.
 	| NoComponentStreamID
-	| ComponentHandshakeFailed
 	deriving (Show)
 
 data Context = Context H.Handle Text SAX.Parser
@@ -141,7 +152,7 @@ readEvents done = xmpp where
 		X.readEvents done nextEvents
 	
 	failableToList f = case f of
-		FL.Fail (SAX.Error e) -> E.throwError $ MarkupError e
+		FL.Fail (SAX.Error e) -> E.throwError $ TransportError e
 		FL.Done -> return []
 		FL.Next e es -> do
 			es' <- failableToList es
@@ -153,7 +164,7 @@ getElement = xmpp where
 		events <- readEvents endOfTree
 		case X.eventsToElement events of
 			Just x -> return x
-			Nothing -> E.throwError $ MarkupError "getElement: invalid event list"
+			Nothing -> E.throwError $ TransportError "getElement: invalid event list"
 	
 	endOfTree 0 (SAX.EndElement _) = True
 	endOfTree _ _ = False

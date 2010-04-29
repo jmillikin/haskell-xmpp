@@ -81,6 +81,11 @@ authenticationMechanisms = step where
 		(F.FeatureSASL ms) -> ms
 		_ -> step fs
 
+-- | Send a @\<bind\>@ message for the given 'J.JID', returning the server's reply. In
+-- most cases the reply will be the same as the input. However, if the input has no
+-- 'J.Resource', the returned 'J.JID' will contain a generated 'J.Resource'.
+-- 
+-- Clients must bind a 'J.JID' before sending any 'Stanza's.
 bindJID :: J.JID -> M.XMPP J.JID
 bindJID jid = do
 	-- Bind

@@ -20,6 +20,7 @@ module Network.Protocol.XMPP.ErrorT
 	) where
 
 import Control.Monad (liftM)
+import Control.Monad.Fix (MonadFix, mfix)
 import Control.Monad.Trans (MonadIO, liftIO)
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import qualified Control.Monad.Error as E
@@ -59,6 +60,11 @@ instance R.MonadReader m => R.MonadReader (ErrorT e m) where
 
 instance MonadIO m => MonadIO (ErrorT e m) where
 	liftIO = lift . liftIO
+
+instance MonadFix m => MonadFix (ErrorT e m) where
+	mfix f = ErrorT $ mfix $ \ex -> runErrorT $ f $ case ex of
+		Right x -> x
+		_        -> error "empty mfix parameter"
 
 mapErrorT :: (m (Either e a) -> n (Either e' b))
            -> ErrorT e m a

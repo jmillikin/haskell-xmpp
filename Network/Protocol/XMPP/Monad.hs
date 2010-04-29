@@ -34,6 +34,9 @@ module Network.Protocol.XMPP.Monad
 	, putElement
 	, putStanza
 	) where
+import qualified Control.Applicative as A
+import Control.Monad (ap)
+import Control.Monad.Fix (MonadFix, mfix)
 import Control.Monad.Trans (MonadIO, liftIO)
 import qualified Control.Monad.Error as E
 import qualified Control.Monad.Reader as R
@@ -77,6 +80,13 @@ instance E.MonadError XMPP where
 	type E.ErrorType XMPP = Error
 	throwError = XMPP . E.throwError
 	catchError m h = XMPP $ E.catchError (unXMPP m) (unXMPP . h)
+
+instance A.Applicative XMPP where
+	pure = return
+	(<*>) = ap
+
+instance MonadFix XMPP where
+	mfix f = XMPP $ mfix $ unXMPP . f
 
 runXMPP :: Context -> XMPP a -> IO (Either Error a)
 runXMPP ctx xmpp = R.runReaderT (runErrorT (unXMPP xmpp)) ctx

@@ -94,9 +94,9 @@ saslLoop ctx = do
 	elemt <- getElement ctx
 	let challengeText =
 		return elemt
-		>>= X.hasName (X.Name "challenge" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing)
+		>>= X.named (X.Name "challenge" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing)
 		>>= X.elementNodes
-		>>= X.getText
+		>>= X.isText
 	when (null challengeText) $ saslError "Received empty challenge"
 	
 	(b64text, rc) <- SASL.step64 . B.pack . concatMap TL.unpack $ challengeText
@@ -111,7 +111,7 @@ saslFinish ctx = do
 	elemt <- getElement ctx
 	let success =
 		return elemt
-		>>= X.hasName (X.Name "success" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing)
+		>>= X.named (X.Name "success" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing)
 	return $ if null success then Failure else Success
 
 putElement :: M.Context -> X.Element -> SASL.Session ()

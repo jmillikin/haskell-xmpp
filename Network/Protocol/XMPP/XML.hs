@@ -16,41 +16,48 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.XML
 	( module Data.XML.Types
+	-- * Filters
+	, isElement
+	, isText
 	, elementChildren
-	, hasName
+	, named
 	, getattr
-	, getText
+	
+	-- * Constructors
 	, name
 	, nsname
 	, element
 	, nselement
+	
+	-- * Misc
 	, escape
 	, serialiseElement
 	, readEvents
 	, SAX.eventsToElement
 	) where
+import Control.Monad ((>=>))
 import qualified Data.Text.Lazy as T
 import Data.XML.Types
 import qualified Text.XML.LibXML.SAX as SAX
-
-elementChildren :: Element -> [Element]
-elementChildren = concatMap isElement . elementNodes
-
-hasName :: Name -> Element -> [Element]
-hasName n e = [e | elementName e == n]
 
 isElement :: Node -> [Element]
 isElement (NodeElement e) = [e]
 isElement _ = []
 
+isText :: Node -> [T.Text]
+isText (NodeText t) = [t]
+isText _ = []
+
+elementChildren :: Element -> [Element]
+elementChildren = elementNodes >=> isElement
+
+named :: Named a => Name -> a -> [a]
+named n x = [x | getName x == n]
+
 getattr :: Name -> Element -> Maybe T.Text
-getattr attrname elemt = case filter ((attrname ==) . attributeName) $ elementAttributes elemt of
+getattr n e = case elementAttributes e >>= named n of
 	[] -> Nothing
 	attr:_ -> Just $ attributeValue attr
-
-getText :: Node -> [T.Text]
-getText (NodeText t) = [t]
-getText _ = []
 
 name :: T.Text -> Name
 name t = Name t Nothing Nothing

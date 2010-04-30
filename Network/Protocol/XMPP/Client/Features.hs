@@ -34,8 +34,8 @@ data Feature =
 	deriving (Show, Eq)
 
 parseFeatures :: X.Element -> [Feature]
-parseFeatures elemt =
-	X.hasName nameFeatures elemt
+parseFeatures e =
+	X.named nameFeatures e
 	>>= X.elementChildren
 	>>= return . parseFeature
 
@@ -56,9 +56,9 @@ parseFeatureTLS _ = FeatureStartTLS True -- TODO: detect whether or not required
 parseFeatureSASL :: X.Element -> Feature
 parseFeatureSASL e = FeatureSASL $
 	X.elementChildren e
-	>>= X.hasName nameMechanism
+	>>= X.named nameMechanism
 	>>= X.elementNodes
-	>>= X.getText
+	>>= X.isText
 	>>= return . B.pack . TL.unpack
 
 nameMechanism :: X.Name

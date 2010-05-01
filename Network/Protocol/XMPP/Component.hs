@@ -75,7 +75,7 @@ authenticate streamID password = do
 	M.putElement $ X.element "handshake" [] [X.NodeText digest]
 	result <- M.getElement
 	let nameHandshake = X.Name "handshake" (Just "jabber:component:accept") Nothing
-	when (null (X.named nameHandshake result)) $
+	when (null (X.isNamed nameHandshake result)) $
 		throwError M.AuthenticationFailure
 
 buildSecret :: T.Text -> T.Text -> B.ByteString

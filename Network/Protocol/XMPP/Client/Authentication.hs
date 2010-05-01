@@ -20,7 +20,7 @@ module Network.Protocol.XMPP.Client.Authentication
 	, authenticate
 	) where
 import qualified Control.Exception as Exc
-import Control.Monad (when)
+import Control.Monad (when, (>=>))
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Control.Monad.Error as E
 import qualified Data.ByteString.Char8 as B
@@ -92,11 +92,8 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 saslLoop :: M.Context -> SASL.Session Result
 saslLoop ctx = do
 	elemt <- getElement ctx
-	let challengeText =
-		return elemt
-		>>= X.named (X.Name "challenge" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing)
-		>>= X.elementNodes
-		>>= X.isText
+	let name = X.Name "challenge" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing
+	let challengeText = X.isNamed name >=> X.elementNodes >=> X.isText $ elemt
 	when (null challengeText) $ saslError "Received empty challenge"
 	
 	(b64text, rc) <- SASL.step64 . B.pack . concatMap TL.unpack $ challengeText
@@ -109,9 +106,8 @@ saslLoop ctx = do
 saslFinish :: M.Context -> SASL.Session Result
 saslFinish ctx = do
 	elemt <- getElement ctx
-	let success =
-		return elemt
-		>>= X.named (X.Name "success" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing)
+	let name = X.Name "success" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing
+	let success = X.isNamed name elemt
 	return $ if null success then Failure else Success
 
 putElement :: M.Context -> X.Element -> SASL.Session ()

@@ -93,7 +93,7 @@ bindJID jid = do
 	bindResult <- M.getStanza
 	let getJID e =
 		X.elementChildren e
-		>>= X.named (X.Name "jid" (Just "urn:ietf:params:xml:ns:xmpp-bind") Nothing)
+		>>= X.isNamed (X.Name "jid" (Just "urn:ietf:params:xml:ns:xmpp-bind") Nothing)
 		>>= X.elementNodes
 		>>= X.isText
 	

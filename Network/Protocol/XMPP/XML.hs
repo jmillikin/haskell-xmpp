@@ -16,12 +16,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.XML
 	( module Data.XML.Types
-	-- * Filters
-	, isElement
-	, isText
-	, elementChildren
-	, named
-	, getattr
 	
 	-- * Constructors
 	, name
@@ -30,32 +24,18 @@ module Network.Protocol.XMPP.XML
 	, nselement
 	
 	-- * Misc
+	, getattr
 	, escape
 	, serialiseElement
 	, readEvents
 	, SAX.eventsToElement
 	) where
-import Control.Monad ((>=>))
 import qualified Data.Text.Lazy as T
 import Data.XML.Types
 import qualified Text.XML.LibXML.SAX as SAX
 
-isElement :: Node -> [Element]
-isElement (NodeElement e) = [e]
-isElement _ = []
-
-isText :: Node -> [T.Text]
-isText (NodeText t) = [t]
-isText _ = []
-
-elementChildren :: Element -> [Element]
-elementChildren = elementNodes >=> isElement
-
-named :: Named a => Name -> a -> [a]
-named n x = [x | getName x == n]
-
 getattr :: Name -> Element -> Maybe T.Text
-getattr n e = case elementAttributes e >>= named n of
+getattr n e = case elementAttributes e >>= isNamed n of
 	[] -> Nothing
 	attr:_ -> Just $ attributeValue attr
 

@@ -55,7 +55,7 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 	utf8 = TE.encodeUtf8 . T.concat . TL.toChunks
 	
 	xmpp = do
-		ctx <- M.getContext
+		ctx <- M.getSession
 		res <- liftIO $ Exc.try $ SASL.runSASL $ do
 			suggested <- SASL.clientSuggestMechanism mechanisms
 			case suggested of
@@ -89,7 +89,7 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 			Right x -> return x
 			Left err -> saslError $ TL.pack $ show err
 
-saslLoop :: M.Context -> SASL.Session Result
+saslLoop :: M.Session -> SASL.Session Result
 saslLoop ctx = do
 	elemt <- getElement ctx
 	let name = X.Name "challenge" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing
@@ -103,21 +103,21 @@ saslLoop ctx = do
 		SASL.Complete -> saslFinish ctx
 		SASL.NeedsMore -> saslLoop ctx
 
-saslFinish :: M.Context -> SASL.Session Result
+saslFinish :: M.Session -> SASL.Session Result
 saslFinish ctx = do
 	elemt <- getElement ctx
 	let name = X.Name "success" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing
 	let success = X.isNamed name elemt
 	return $ if null success then Failure else Success
 
-putElement :: M.Context -> X.Element -> SASL.Session ()
+putElement :: M.Session -> X.Element -> SASL.Session ()
 putElement ctx elemt = liftIO $ do
 	res <- M.runXMPP ctx $ M.putElement elemt
 	case res of
 		Left err -> Exc.throwIO $ XmppError err
 		Right x -> return x
 
-getElement :: M.Context -> SASL.Session X.Element
+getElement :: M.Session -> SASL.Session X.Element
 getElement ctx = liftIO $ do
 	res <- M.runXMPP ctx M.getElement
 	case res of

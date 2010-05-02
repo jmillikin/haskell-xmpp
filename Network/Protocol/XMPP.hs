@@ -60,9 +60,9 @@ module Network.Protocol.XMPP
 	, getStanza
 	, bindJID
 	
-	-- ** Context hook
-	, Context
-	, getContext
+	-- ** Resuming sessions
+	, Session
+	, getSession
 	, runXMPP
 	) where
 import Network.Protocol.XMPP.Client

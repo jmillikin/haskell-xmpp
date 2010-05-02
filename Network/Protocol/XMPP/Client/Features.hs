@@ -58,8 +58,8 @@ parseFeatureSASL e = FeatureSASL $
 	X.elementChildren e
 	>>= X.isNamed nameMechanism
 	>>= X.elementNodes
-	>>= X.isText
-	>>= return . B.pack . TL.unpack
+	>>= X.isContent
+	>>= return . B.pack . TL.unpack . X.contentText
 
 nameMechanism :: X.Name
 nameMechanism = X.Name "mechanism" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing

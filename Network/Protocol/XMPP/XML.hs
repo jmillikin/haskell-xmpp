@@ -25,6 +25,8 @@ module Network.Protocol.XMPP.XML
 	
 	-- * Misc
 	, getattr
+	, contentText
+	, attributeText
 	, escape
 	, serialiseElement
 	, readEvents
@@ -37,7 +39,14 @@ import qualified Text.XML.LibXML.SAX as SAX
 getattr :: Name -> Element -> Maybe T.Text
 getattr n e = case elementAttributes e >>= isNamed n of
 	[] -> Nothing
-	attr:_ -> Just $ attributeValue attr
+	attr:_ -> Just $ attributeText attr
+
+contentText :: Content -> T.Text
+contentText (ContentText t) = t
+contentText (ContentEntity e) = T.concat ["&", e, ";"]
+
+attributeText :: Attribute -> T.Text
+attributeText = T.concat . map contentText . attributeContent
 
 name :: T.Text -> Name
 name t = Name t Nothing Nothing
@@ -55,13 +64,20 @@ escape = T.concatMap escapeChar where
 		'\'' -> "&apos;"
 		_ -> T.singleton c
 
+escapeContent :: Content -> T.Text
+escapeContent (ContentText t) = escape t
+escapeContent (ContentEntity e) = T.concat ["&", escape e, ";"]
+
 element :: T.Text -> [(T.Text, T.Text)] -> [Node] -> Element
 element elemName attrs children = Element (name elemName) attrs' children where
-	attrs' = [Attribute (name n) value | (n, value) <- attrs]
+	attrs' = map (uncurry mkattr) attrs
 
 nselement :: T.Text -> T.Text -> [(T.Text, T.Text)] -> [Node] -> Element
 nselement ns ln attrs children = Element (nsname ns ln) attrs' children where
-	attrs' = [Attribute (name n) value | (n, value) <- attrs]
+	attrs' = map (uncurry mkattr) attrs
+
+mkattr :: T.Text -> T.Text -> Attribute
+mkattr n val = Attribute (name n) [ContentText val]
 
 -- A somewhat primitive serialisation function
 --
@@ -72,14 +88,14 @@ serialiseElement e = text where
 	eName = formatName $ elementName e
 	formatName = escape . nameLocalName
 	attrs = T.intercalate " " $ map attr $ elementAttributes e ++ nsattr
-	attr (Attribute n v) = T.concat [formatName n, "=\"", escape v, "\""]
+	attr (Attribute n c) = T.concat $ [formatName n, "=\""] ++ map escapeContent c ++ ["\""]
 	nsattr = case nameNamespace $ elementName e of
 		Nothing -> []
-		Just ns -> [Attribute (name "xmlns") ns]
+		Just ns -> [mkattr "xmlns" ns]
 	contents = T.concat $ map serialiseNode $ elementNodes e
 	
 	serialiseNode (NodeElement e') = serialiseElement e'
-	serialiseNode (NodeText t) = escape t
+	serialiseNode (NodeContent c) = escape (contentText c)
 	serialiseNode (NodeComment _) = ""
 	serialiseNode (NodeInstruction _) = ""
 

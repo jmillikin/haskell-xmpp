@@ -18,6 +18,7 @@ module Network.Protocol.XMPP.Client
 	( runClient
 	, bindJID
 	) where
+import Control.Monad ((>=>))
 import Control.Monad.Error (throwError)
 import Control.Monad.Trans (liftIO)
 import Data.ByteString (ByteString)
@@ -91,11 +92,12 @@ bindJID jid = do
 	-- Bind
 	M.putStanza . bindStanza . J.jidResource $ jid
 	bindResult <- M.getStanza
-	let getJID e =
-		X.elementChildren e
-		>>= X.isNamed (X.Name "jid" (Just "urn:ietf:params:xml:ns:xmpp-bind") Nothing)
-		>>= X.elementNodes
-		>>= X.isText
+	let getJID =
+		X.elementChildren
+		>=> X.isNamed (X.Name "jid" (Just "urn:ietf:params:xml:ns:xmpp-bind") Nothing)
+		>=> X.elementNodes
+		>=> X.isContent
+		>=> return . X.contentText
 	
 	let maybeJID = do
 		iq <- case bindResult of
@@ -125,7 +127,8 @@ bindStanza resource = (emptyIQ IQSet) { iqPayload = Just payload } where
 	payload = X.nselement "urn:ietf:params:xml:ns:xmpp-bind" "bind" [] requested
 	requested = case fmap J.strResource resource of
 		Nothing -> []
-		Just x -> [X.NodeElement $ X.element "resource" [] [X.NodeText x]]
+		Just x -> [X.NodeElement $ X.element "resource" []
+			[X.NodeContent $ X.ContentText x]]
 
 sessionStanza :: IQ
 sessionStanza = (emptyIQ IQSet) { iqPayload = Just payload } where

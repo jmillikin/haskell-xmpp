@@ -62,7 +62,7 @@ beginStream jid = do
 parseStreamID :: SAX.Event -> Maybe T.Text
 parseStreamID (SAX.BeginElement _ attrs) = sid where
 	sid = case idAttrs of
-		(x:_) -> Just . X.attributeValue $ x
+		(x:_) -> Just . X.attributeText $ x
 		_ -> Nothing
 	idAttrs = filter (matchingName . X.attributeName) attrs
 	matchingName = (== X.Name "jid" (Just "jabber:component:accept") Nothing)
@@ -72,7 +72,7 @@ authenticate :: T.Text -> T.Text -> M.XMPP ()
 authenticate streamID password = do
 	let bytes = buildSecret streamID password
 	let digest = showDigest $ sha1 bytes
-	M.putElement $ X.element "handshake" [] [X.NodeText digest]
+	M.putElement $ X.element "handshake" [] [X.NodeContent $ X.ContentText digest]
 	result <- M.getElement
 	let nameHandshake = X.Name "handshake" (Just "jabber:component:accept") Nothing
 	when (null (X.isNamed nameHandshake result)) $

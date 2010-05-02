@@ -18,13 +18,13 @@
 module Network.Protocol.XMPP.Monad
 	( XMPP (..)
 	, Error (..)
-	, Context (..)
+	, Session (..)
 	, runXMPP
 	, startXMPP
 	, restartXMPP
 	
 	, getHandle
-	, getContext
+	, getSession
 	
 	, readEvents
 	, getElement
@@ -73,9 +73,9 @@ data Error
 	| NoComponentStreamID
 	deriving (Show)
 
-data Context = Context H.Handle Text SAX.Parser
+data Session = Session H.Handle Text SAX.Parser
 
-newtype XMPP a = XMPP { unXMPP :: ErrorT Error (R.ReaderT Context IO) a }
+newtype XMPP a = XMPP { unXMPP :: ErrorT Error (R.ReaderT Session IO) a }
 
 instance Functor XMPP where
 	fmap f = XMPP . fmap f . unXMPP
@@ -99,27 +99,27 @@ instance A.Applicative XMPP where
 instance MonadFix XMPP where
 	mfix f = XMPP $ mfix $ unXMPP . f
 
-runXMPP :: Context -> XMPP a -> IO (Either Error a)
-runXMPP ctx xmpp = R.runReaderT (runErrorT (unXMPP xmpp)) ctx
+runXMPP :: Session -> XMPP a -> IO (Either Error a)
+runXMPP s xmpp = R.runReaderT (runErrorT (unXMPP xmpp)) s
 
 startXMPP :: H.Handle -> Text -> XMPP a -> IO (Either Error a)
 startXMPP h ns xmpp = do
 	sax <- SAX.newParser
-	runXMPP (Context h ns sax) xmpp
+	runXMPP (Session h ns sax) xmpp
 
 restartXMPP :: Maybe H.Handle -> XMPP a -> XMPP a
 restartXMPP newH xmpp = do
-	Context oldH ns _ <- getContext
+	Session oldH ns _ <- getSession
 	sax <- liftIO SAX.newParser
-	let ctx = Context (maybe oldH id newH) ns sax
-	XMPP $ R.local (const ctx) (unXMPP xmpp)
+	let s = Session (maybe oldH id newH) ns sax
+	XMPP $ R.local (const s) (unXMPP xmpp)
 
-getContext :: XMPP Context
-getContext = XMPP R.ask
+getSession :: XMPP Session
+getSession = XMPP R.ask
 
 getHandle :: XMPP H.Handle
 getHandle = do
-	Context h _ _ <- getContext
+	Session h _ _ <- getSession
 	return h
 
 liftTLS :: ErrorT Text IO a -> XMPP a
@@ -143,7 +143,7 @@ putStanza = putElement . S.stanzaToElement
 readEvents :: (Integer -> SAX.Event -> Bool) -> XMPP [SAX.Event]
 readEvents done = xmpp where
 	xmpp = do
-		Context h _ p <- getContext
+		Session h _ p <- getSession
 		let nextEvents = do
 			-- TODO: read in larger increments
 			bytes <- liftTLS $ H.hGetBytes h 1
@@ -172,7 +172,7 @@ getElement = xmpp where
 getStanza :: XMPP S.ReceivedStanza
 getStanza = do
 	elemt <- getElement
-	Context _ ns _ <- getContext
+	Session _ ns _ <- getSession
 	case S.elementToStanza ns elemt of
 		Just x -> return x
 		Nothing -> E.throwError $ InvalidStanza elemt

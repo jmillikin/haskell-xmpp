@@ -79,7 +79,7 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 			(b64text, rc) <- SASL.step64 $ B.pack ""
 			putElement ctx $ X.nselement "urn:ietf:params:xml:ns:xmpp-sasl" "auth"
 				[("mechanism", TL.pack $ B.unpack mechBytes)]
-				[X.NodeText $ TL.pack $ B.unpack b64text]
+				[X.NodeContent $ X.ContentText $ TL.pack $ B.unpack b64text]
 			
 			case rc of
 				SASL.Complete -> saslFinish ctx
@@ -93,12 +93,17 @@ saslLoop :: M.Session -> SASL.Session Result
 saslLoop ctx = do
 	elemt <- getElement ctx
 	let name = X.Name "challenge" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing
-	let challengeText = X.isNamed name >=> X.elementNodes >=> X.isText $ elemt
+	let getChallengeText =
+		X.isNamed name
+		>=> X.elementNodes
+		>=> X.isContent
+		>=> return . X.contentText
+	let challengeText = getChallengeText elemt
 	when (null challengeText) $ saslError "Received empty challenge"
 	
 	(b64text, rc) <- SASL.step64 . B.pack . concatMap TL.unpack $ challengeText
 	putElement ctx $ X.nselement "urn:ietf:params:xml:ns:xmpp-sasl" "response"
-		[] [X.NodeText $ TL.pack $ B.unpack b64text]
+		[] [X.NodeContent $ X.ContentText $ TL.pack $ B.unpack b64text]
 	case rc of
 		SASL.Complete -> saslFinish ctx
 		SASL.NeedsMore -> saslLoop ctx

@@ -85,7 +85,7 @@ runEcho hostname user password = do
 			stanza <- getStanza
 			liftIO $ putStr "\n" >> print stanza >> putStrLn "\n"
 			case stanza of
-				ReceivedMessage msg -> putStanza $ echo jid msg
+				ReceivedMessage msg -> putStanza $ echo msg
 				_ -> return ()
 	
 	-- If 'runClient' terminated due to an XMPP error, propagate it as an exception.
@@ -94,12 +94,18 @@ runEcho hostname user password = do
 		Left err -> error $ show err
 		Right _ -> return ()
 
--- Copy a 'Message' into another message, setting the 'messageFrom' field to some 'JID'.
-echo :: JID ->  Message -> Message
-echo jid msg = Message
+-- Copy a 'Message' into another message, setting the 'messageTo' field to the
+-- original sender's address.
+echo :: Message -> Message
+echo msg = Message
 	{ messageType = MessageNormal
 	, messageTo = messageFrom msg
-	, messageFrom = Just jid
+	
+	-- Note: Conforming XMPP servers populate the "from" attribute on
+	-- stanzas, to prevent clients from spoofing it. Therefore, the
+	-- 'messageFrom' field's value is irrelevant when sending stanzas.
+	, messageFrom = Nothing
+	
 	, messageID = Nothing
 	, messageLang = Nothing
 	, messagePayloads = messagePayloads msg

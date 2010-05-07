@@ -21,13 +21,16 @@
 -- FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 -- OTHER DEALINGS IN THE SOFTWARE.
 
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 -- XMPP imports
 import Network
 import Network.Protocol.XMPP
+import Data.XML.Types
 
 -- other imports
+import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.Text.Lazy as T
@@ -71,6 +74,12 @@ runEcho hostname user password = do
 	-- 'throwError' and 'catchError' computations to handle errors within an XMPP
 	-- session.
 	res <- runClient server jid username password $ do
+		
+		-- Some servers will close the XMPP connection after some period
+		-- of inactivity. For this example, we'll simply send a "ping" every
+		-- 60 seconds
+		getSession >>= liftIO . forkIO . sendPings 60
+		
 		-- When running a client session, most servers require the user to
 		-- "bind" their JID before sending any stanzas.
 		boundJID <- bindJID jid
@@ -110,6 +119,21 @@ echo msg = Message
 	, messageLang = Nothing
 	, messagePayloads = messagePayloads msg
 	}
+
+-- Send a "ping" occasionally, to prevent server timeouts from
+-- closing the connection.
+sendPings :: Integer -> Session -> IO ()
+sendPings seconds s = forever send where
+	send = do
+		-- Ignore errors
+		runXMPP s $ putStanza ping
+		threadDelay $ fromInteger $ 1000000 * seconds
+	ping = (emptyIQ IQGet)
+		{ iqPayload = Just (Element pingName [] [])
+		}
+
+pingName :: Name
+pingName = Name "ping" (Just "urn:xmpp:ping") Nothing
 
 main :: IO ()
 main = do

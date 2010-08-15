@@ -44,8 +44,6 @@ import qualified Control.Monad.Reader as R
 import qualified Data.ByteString.Lazy.Char8 as B
 import Data.Text.Lazy (Text)
 import Data.Text.Lazy.Encoding (encodeUtf8)
-import qualified Data.FailableList as FL
-import qualified Text.XML.LibXML.SAX as SAX
 
 import Network.Protocol.XMPP.ErrorT
 import qualified Network.Protocol.XMPP.Handle as H
@@ -77,7 +75,7 @@ data Error
 data Session = Session
 	{ sessionHandle :: H.Handle
 	, sessionNamespace :: Text
-	, sessionParser :: SAX.Parser
+	, sessionParser :: X.Parser
 	, sessionReadLock :: M.MVar ()
 	, sessionWriteLock :: M.MVar ()
 	}
@@ -111,7 +109,7 @@ runXMPP s xmpp = R.runReaderT (runErrorT (unXMPP xmpp)) s
 
 startXMPP :: H.Handle -> Text -> XMPP a -> IO (Either Error a)
 startXMPP h ns xmpp = do
-	sax <- SAX.newParser
+	sax <- X.newParser
 	readLock <- M.newMVar ()
 	writeLock <- M.newMVar ()
 	runXMPP (Session h ns sax readLock writeLock) xmpp
@@ -119,7 +117,7 @@ startXMPP h ns xmpp = do
 restartXMPP :: Maybe H.Handle -> XMPP a -> XMPP a
 restartXMPP newH xmpp = do
 	Session oldH ns _ readLock writeLock <- getSession
-	sax <- liftIO SAX.newParser
+	sax <- liftIO $ X.newParser
 	let s = Session (maybe oldH id newH) ns sax readLock writeLock
 	XMPP $ R.local (const s) (unXMPP xmpp)
 
@@ -156,23 +154,18 @@ putElement = putBytes . encodeUtf8 . X.serialiseElement
 putStanza :: S.Stanza a => a -> XMPP ()
 putStanza = withLock sessionWriteLock . putElement . S.stanzaToElement
 
-readEvents :: (Integer -> SAX.Event -> Bool) -> XMPP [SAX.Event]
+readEvents :: (Integer -> X.Event -> Bool) -> XMPP [X.Event]
 readEvents done = xmpp where
 	xmpp = do
 		Session h _ p _ _ <- getSession
 		let nextEvents = do
 			-- TODO: read in larger increments
 			bytes <- liftTLS $ H.hGetBytes h 1
-			failable <- liftIO $ SAX.parse p bytes False
-			failableToList failable
+			parsed <- liftIO $ X.parse p bytes False
+			case parsed of
+				Left err -> E.throwError $ TransportError err
+				Right events -> return events
 		X.readEvents done nextEvents
-	
-	failableToList f = case f of
-		FL.Fail (SAX.Error e) -> E.throwError $ TransportError e
-		FL.Done -> return []
-		FL.Next e es -> do
-			es' <- failableToList es
-			return $ e : es'
 
 getElement :: XMPP X.Element
 getElement = xmpp where
@@ -182,7 +175,7 @@ getElement = xmpp where
 			Just x -> return x
 			Nothing -> E.throwError $ TransportError "getElement: invalid event list"
 	
-	endOfTree 0 (SAX.EndElement _) = True
+	endOfTree 0 (X.EndElement _) = True
 	endOfTree _ _ = False
 
 getStanza :: XMPP S.ReceivedStanza

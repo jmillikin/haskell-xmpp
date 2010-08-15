@@ -29,7 +29,6 @@ import qualified Data.Text.Lazy.Encoding as TE
 import Network (connectTo)
 import Network.Protocol.SASL.GNU (sha1)
 import qualified System.IO as IO
-import qualified Text.XML.LibXML.SAX as SAX
 
 import qualified Network.Protocol.XMPP.Connections as C
 import qualified Network.Protocol.XMPP.Handle as H
@@ -59,8 +58,8 @@ beginStream jid = do
 		Nothing -> throwError M.NoComponentStreamID
 		Just x -> return x
 
-parseStreamID :: SAX.Event -> Maybe T.Text
-parseStreamID (SAX.BeginElement _ attrs) = sid where
+parseStreamID :: X.Event -> Maybe T.Text
+parseStreamID (X.BeginElement _ attrs) = sid where
 	sid = case idAttrs of
 		(x:_) -> Just . X.attributeText $ x
 		_ -> Nothing

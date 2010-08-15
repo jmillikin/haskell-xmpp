@@ -30,10 +30,20 @@ module Network.Protocol.XMPP.XML
 	, escape
 	, serialiseElement
 	, readEvents
-	, SAX.eventsToElement
+	
+	-- * libxml-sax-0.4 API imitation
+	, Parser
+	, Event (..)
+	, newParser
+	, parse
+	, eventsToElement
+	
 	) where
+import Control.Monad (when)
+import qualified Data.ByteString.Lazy as B
 import qualified Data.Text.Lazy as T
 import Data.XML.Types
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import qualified Text.XML.LibXML.SAX as SAX
 
 getattr :: Name -> Element -> Maybe T.Text
@@ -99,10 +109,53 @@ serialiseElement e = text where
 	serialiseNode (NodeComment _) = ""
 	serialiseNode (NodeInstruction _) = ""
 
+-- quick-and-dirty imitation of libxml-sax-0.4 API; later, this should
+-- probably be rewritten to use ST and discard the list parsing
+data Parser = Parser (SAX.Parser IO) (IORef (Either T.Text [Event]))
+
+newParser :: IO Parser
+newParser = do
+	let toLazy t = T.fromChunks [t]
+	
+	ref <- newIORef (Right [])
+	p <- SAX.newParserIO (\err -> writeIORef ref (Left $ toLazy err)) Nothing
+	
+	let addEvent e = do
+		x <- readIORef ref
+		case x of
+			Left _ -> return ()
+			Right es -> writeIORef ref (Right (e:es))
+		return True
+	
+	SAX.setCallback p SAX.parsedBeginElement (\name' attrs -> addEvent $ BeginElement name' attrs)
+	SAX.setCallback p SAX.parsedEndElement (\name' -> addEvent $ EndElement name')
+	SAX.setCallback p SAX.parsedCharacters (\txt -> addEvent $ Characters $ toLazy txt)
+	SAX.setCallback p SAX.parsedComment (\txt -> addEvent $ Comment $ toLazy txt)
+	SAX.setCallback p SAX.parsedInstruction (\i -> addEvent $ ProcessingInstruction i)
+	
+	return $ Parser p ref
+
+parse :: Parser -> B.ByteString -> Bool -> IO (Either T.Text [Event])
+parse (Parser p ref) bytes finish = do
+	writeIORef ref (Right [])
+	SAX.parseLazyBytes p bytes
+	when finish $ SAX.parseComplete p
+	eitherEvents <- readIORef ref
+	return $ case eitherEvents of
+		Left err -> Left err
+		Right events -> Right $ reverse events
+
+data Event
+	= BeginElement Name [Attribute]
+	| EndElement Name
+	| Characters T.Text
+	| Comment T.Text
+	| ProcessingInstruction Instruction
+
 readEvents :: Monad m
-           => (Integer -> SAX.Event -> Bool)
-           -> m [SAX.Event]
-           -> m [SAX.Event]
+           => (Integer -> Event -> Bool)
+           -> m [Event]
+           -> m [Event]
 readEvents done nextEvents = readEvents' 0 [] where
 	readEvents' depth acc = do
 		events <- nextEvents
@@ -114,10 +167,49 @@ readEvents done nextEvents = readEvents' 0 [] where
 	step [] depth acc = (False, depth, acc)
 	step (e:es) depth acc = let
 		depth' = depth + case e of
-			(SAX.BeginElement _ _) -> 1
-			(SAX.EndElement _) -> (- 1)
+			(BeginElement _ _) -> 1
+			(EndElement _) -> (- 1)
 			_ -> 0
 		acc' = e : acc
 		in if done depth' e
 			then (True, depth', reverse acc')
 			else step es depth' acc'
+
+-- | Convert a list of events to a single 'X.Element'. If the events do not
+-- contain at least one valid element, 'Nothing' will be returned instead.
+eventsToElement :: [Event] -> Maybe Element
+eventsToElement es = case eventsToNodes es >>= isElement of
+	(e:_) -> Just e
+	_ -> Nothing
+
+eventsToNodes :: [Event] -> [Node]
+eventsToNodes = concatMap blockToNodes . splitBlocks
+
+-- Split event list into a sequence of "blocks", which are the events including
+-- and between a pair of tags. <start><start2/></start> and <start/> are both
+-- single blocks.
+splitBlocks :: [Event] -> [[Event]]
+splitBlocks es = ret where
+	(_, _, ret) = foldl splitBlocks' (0, [], []) es
+	
+	splitBlocks' (depth, accum, allAccum) e = split where
+		split = if depth' == 0
+			then (depth', [], allAccum ++ [accum'])
+			else (depth', accum', allAccum)
+		accum' = accum ++ [e]
+		depth' :: Integer
+		depth' = depth + case e of
+			(BeginElement _ _) -> 1
+			(EndElement _) -> (- 1)
+			_ -> 0
+
+blockToNodes :: [Event] -> [Node]
+blockToNodes [] = []
+blockToNodes (begin:rest) = nodes where
+	end = last rest
+	nodes = case (begin, end) of
+		(BeginElement name' attrs, EndElement _) -> [node name' attrs]
+		(Characters t, _) -> [NodeContent (ContentText t)]
+		_ -> []
+	
+	node n as = NodeElement $ Element n as $ eventsToNodes $ init rest

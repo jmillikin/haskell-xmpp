@@ -24,7 +24,6 @@ import Network (HostName, PortID)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Text.Lazy as T
 import Data.Text.Lazy.Encoding (encodeUtf8)
-import qualified Text.XML.LibXML.SAX as SAX
 
 import qualified Network.Protocol.XMPP.XML as X
 import Network.Protocol.XMPP.JID (JID, formatJID)
@@ -49,9 +48,9 @@ xmlHeader ns jid = encodeUtf8 header where
 		, " xmlns:stream=\"http://etherx.jabber.org/streams\">"
 		]
 
-startOfStream :: Integer -> SAX.Event -> Bool
+startOfStream :: Integer -> X.Event -> Bool
 startOfStream depth event = case (depth, event) of
-	(1, (SAX.BeginElement elemName _)) -> qnameStream == elemName
+	(1, (X.BeginElement elemName _)) -> qnameStream == elemName
 	_ -> False
 
 qnameStream :: X.Name

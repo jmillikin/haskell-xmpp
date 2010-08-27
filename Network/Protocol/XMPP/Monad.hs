@@ -154,7 +154,7 @@ putElement = putBytes . encodeUtf8 . X.serialiseElement
 putStanza :: S.Stanza a => a -> XMPP ()
 putStanza = withLock sessionWriteLock . putElement . S.stanzaToElement
 
-readEvents :: (Integer -> X.Event -> Bool) -> XMPP [X.Event]
+readEvents :: (Integer -> X.SaxEvent -> Bool) -> XMPP [X.SaxEvent]
 readEvents done = xmpp where
 	xmpp = do
 		Session h _ p _ _ <- getSession

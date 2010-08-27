@@ -33,7 +33,7 @@ module Network.Protocol.XMPP.XML
 	
 	-- * libxml-sax-0.4 API imitation
 	, Parser
-	, Event (..)
+	, SaxEvent (..)
 	, newParser
 	, parse
 	, eventsToElement
@@ -111,7 +111,7 @@ serialiseElement e = text where
 
 -- quick-and-dirty imitation of libxml-sax-0.4 API; later, this should
 -- probably be rewritten to use ST and discard the list parsing
-data Parser = Parser (SAX.Parser IO) (IORef (Either T.Text [Event]))
+data Parser = Parser (SAX.Parser IO) (IORef (Either T.Text [SaxEvent]))
 
 newParser :: IO Parser
 newParser = do
@@ -135,7 +135,7 @@ newParser = do
 	
 	return $ Parser p ref
 
-parse :: Parser -> B.ByteString -> Bool -> IO (Either T.Text [Event])
+parse :: Parser -> B.ByteString -> Bool -> IO (Either T.Text [SaxEvent])
 parse (Parser p ref) bytes finish = do
 	writeIORef ref (Right [])
 	SAX.parseLazyBytes p bytes
@@ -145,7 +145,7 @@ parse (Parser p ref) bytes finish = do
 		Left err -> Left err
 		Right events -> Right $ reverse events
 
-data Event
+data SaxEvent
 	= BeginElement Name [Attribute]
 	| EndElement Name
 	| Characters T.Text
@@ -153,9 +153,9 @@ data Event
 	| ProcessingInstruction Instruction
 
 readEvents :: Monad m
-           => (Integer -> Event -> Bool)
-           -> m [Event]
-           -> m [Event]
+           => (Integer -> SaxEvent -> Bool)
+           -> m [SaxEvent]
+           -> m [SaxEvent]
 readEvents done nextEvents = readEvents' 0 [] where
 	readEvents' depth acc = do
 		events <- nextEvents
@@ -177,18 +177,18 @@ readEvents done nextEvents = readEvents' 0 [] where
 
 -- | Convert a list of events to a single 'X.Element'. If the events do not
 -- contain at least one valid element, 'Nothing' will be returned instead.
-eventsToElement :: [Event] -> Maybe Element
+eventsToElement :: [SaxEvent] -> Maybe Element
 eventsToElement es = case eventsToNodes es >>= isElement of
 	(e:_) -> Just e
 	_ -> Nothing
 
-eventsToNodes :: [Event] -> [Node]
+eventsToNodes :: [SaxEvent] -> [Node]
 eventsToNodes = concatMap blockToNodes . splitBlocks
 
 -- Split event list into a sequence of "blocks", which are the events including
 -- and between a pair of tags. <start><start2/></start> and <start/> are both
 -- single blocks.
-splitBlocks :: [Event] -> [[Event]]
+splitBlocks :: [SaxEvent] -> [[SaxEvent]]
 splitBlocks es = ret where
 	(_, _, ret) = foldl splitBlocks' (0, [], []) es
 	
@@ -203,7 +203,7 @@ splitBlocks es = ret where
 			(EndElement _) -> (- 1)
 			_ -> 0
 
-blockToNodes :: [Event] -> [Node]
+blockToNodes :: [SaxEvent] -> [Node]
 blockToNodes [] = []
 blockToNodes (begin:rest) = nodes where
 	end = last rest

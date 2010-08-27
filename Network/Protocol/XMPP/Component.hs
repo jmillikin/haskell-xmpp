@@ -58,7 +58,7 @@ beginStream jid = do
 		Nothing -> throwError M.NoComponentStreamID
 		Just x -> return x
 
-parseStreamID :: X.Event -> Maybe T.Text
+parseStreamID :: X.SaxEvent -> Maybe T.Text
 parseStreamID (X.BeginElement _ attrs) = sid where
 	sid = case idAttrs of
 		(x:_) -> Just . X.attributeText $ x

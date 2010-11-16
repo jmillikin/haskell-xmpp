@@ -161,7 +161,8 @@ readEvents done = xmpp where
 		let nextEvents = do
 			-- TODO: read in larger increments
 			bytes <- liftTLS $ H.hGetBytes h 1
-			parsed <- liftIO $ X.parse p bytes False
+			let eof = B.length bytes == 0
+			parsed <- liftIO $ X.parse p bytes eof
 			case parsed of
 				Left err -> E.throwError $ TransportError err
 				Right events -> return events

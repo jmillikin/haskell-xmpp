@@ -94,7 +94,12 @@ runEcho hostname user password = do
 			stanza <- getStanza
 			liftIO $ putStr "\n" >> print stanza >> putStrLn "\n"
 			case stanza of
-				ReceivedMessage msg -> putStanza $ echo msg
+				ReceivedMessage msg -> if messageType msg == MessageError
+					then return ()
+					else putStanza $ echo msg
+				ReceivedPresence msg -> if presenceType msg == PresenceSubscribe
+					then putStanza (subscribe msg)
+					else return ()
 				_ -> return ()
 	
 	-- If 'runClient' terminated due to an XMPP error, propagate it as an exception.
@@ -118,6 +123,16 @@ echo msg = Message
 	, messageID = Nothing
 	, messageLang = Nothing
 	, messagePayloads = messagePayloads msg
+	}
+
+subscribe :: Presence -> Presence
+subscribe p = Presence
+	{ presenceType = PresenceSubscribed
+	, presenceTo = presenceFrom p
+	, presenceFrom = Nothing
+	, presenceID = Nothing
+	, presenceLang = Nothing
+	, presencePayloads = []
 	}
 
 -- Send a "ping" occasionally, to prevent server timeouts from

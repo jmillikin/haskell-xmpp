@@ -60,8 +60,6 @@ hGetBytes :: Handle -> Integer -> ErrorT T.Text IO B.ByteString
 hGetBytes (PlainHandle h) n = liftIO $  B.hGet h $ fromInteger n
 hGetBytes (SecureHandle h s) n = liftTLS s $ do
 	pending <- TLS.checkPending
-	when (pending == 0) $ do
-		liftIO $ IO.hWaitForInput h (- 1)
-		return ()
-	
+	let wait = IO.hWaitForInput h (- 1) >> return ()
+	when (pending == 0) (liftIO wait)
 	TLS.getBytes n

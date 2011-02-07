@@ -14,6 +14,7 @@
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 module Network.Protocol.XMPP.JID
 	( JID (..)
 	, Node (..)
@@ -69,11 +70,11 @@ instance IsString JID where
 
 parseJID :: T.Text -> Maybe JID
 parseJID str = maybeJID where
-	(node, postNode) = case T.spanBy (/= '@') str of
+	(node, postNode) = case textSpanBy (/= '@') str of
 		(x, y) -> if T.null y
 			then ("", x)
 			else (x, T.drop 1 y)
-	(domain, resource) = case T.spanBy (/= '/') postNode of
+	(domain, resource) = case textSpanBy (/= '/') postNode of
 		(x, y) -> if T.null y
 			then (x, "")
 			else (x, T.drop 1 y)
@@ -104,3 +105,11 @@ formatJID (JID node (Domain domain) resource) = formatted where
 -- Similar to 'comparing'
 equaling :: Eq a => (b -> a) -> b -> b -> Bool
 equaling f x y = f x == f y
+
+-- multi-version 'text' compatibility
+textSpanBy :: (Char -> Bool) -> T.Text -> (T.Text, T.Text)
+#if MIN_VERSION_text(0,11,0)
+textSpanBy = T.span
+#else
+textSpanBy = T.spanBy
+#endif

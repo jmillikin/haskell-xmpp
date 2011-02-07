@@ -60,7 +60,7 @@ runClient server jid username password xmpp = do
 newStream :: J.JID -> M.XMPP [F.Feature]
 newStream jid = do
 	M.putBytes $ C.xmlHeader "jabber:client" jid
-	M.readEvents C.startOfStream
+	void (M.readEvents C.startOfStream)
 	F.parseFeatures `fmap` M.getElement
 
 tryTLS :: J.JID -> [F.Feature] -> ([F.Feature] -> M.XMPP a) -> M.XMPP a
@@ -68,7 +68,7 @@ tryTLS sjid features m
 	| not (streamSupportsTLS features) = m features
 	| otherwise = do
 		M.putElement xmlStartTLS
-		M.getElement
+		void M.getElement
 		h <- M.getHandle
 		eitherTLS <- liftIO $ runErrorT $ H.startTLS h
 		case eitherTLS of
@@ -115,10 +115,10 @@ bindJID jid = do
 	
 	-- Session
 	M.putStanza sessionStanza
-	M.getStanza
+	void M.getStanza
 	
 	M.putStanza $ emptyPresence PresenceAvailable
-	M.getStanza
+	void M.getStanza
 	
 	return returnedJID
 
@@ -141,3 +141,6 @@ streamSupportsTLS = any isStartTLS where
 
 xmlStartTLS :: X.Element
 xmlStartTLS = X.nselement "urn:ietf:params:xml:ns:xmpp-tls" "starttls" [] []
+
+void :: Monad m => m a -> m ()
+void m = m >> return ()

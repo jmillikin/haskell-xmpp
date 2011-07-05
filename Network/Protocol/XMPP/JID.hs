@@ -25,13 +25,14 @@ module Network.Protocol.XMPP.JID
 	, parseJID_
 	, formatJID
 	) where
-import qualified Data.Text.Lazy as T
+import qualified Data.Text.Lazy as TL
+import           Data.Text.Lazy (Text)
 import qualified Data.Text.IDN.StringPrep as SP
 import Data.String (IsString, fromString)
 
-newtype Node = Node { strNode :: T.Text }
-newtype Domain = Domain { strDomain :: T.Text }
-newtype Resource = Resource { strResource :: T.Text }
+newtype Node = Node { strNode :: Text }
+newtype Domain = Domain { strDomain :: Text }
+newtype Resource = Resource { strResource :: Text }
 
 instance Show Node where
 	showsPrec d (Node x) = showParen (d > 10) $
@@ -68,48 +69,48 @@ instance Show JID where
 instance IsString JID where
 	fromString = parseJID_ . fromString
 
-parseJID :: T.Text -> Maybe JID
+parseJID :: Text -> Maybe JID
 parseJID str = maybeJID where
 	(node, postNode) = case textSpanBy (/= '@') str of
-		(x, y) -> if T.null y
+		(x, y) -> if TL.null y
 			then ("", x)
-			else (x, T.drop 1 y)
+			else (x, TL.drop 1 y)
 	(domain, resource) = case textSpanBy (/= '/') postNode of
-		(x, y) -> if T.null y
+		(x, y) -> if TL.null y
 			then (x, "")
-			else (x, T.drop 1 y)
-	nullable x f = if T.null x then Just Nothing else fmap Just $ f x
+			else (x, TL.drop 1 y)
+	nullable x f = if TL.null x then Just Nothing else fmap Just $ f x
 	maybeJID = do
-		preppedNode <- nullable node $ stringprepM SP.profileNodeprep
-		preppedDomain <- stringprepM SP.profileNameprep domain
-		preppedResource <- nullable resource $ stringprepM SP.profileResourceprep
+		preppedNode <- nullable node $ stringprepM SP.xmppNode
+		preppedDomain <- stringprepM SP.nameprep domain
+		preppedResource <- nullable resource $ stringprepM SP.xmppResource
 		return $ JID
 			(fmap Node preppedNode)
 			(Domain preppedDomain)
 			(fmap Resource preppedResource)
-	stringprepM p x = case SP.stringprep p SP.defaultFlags x of
+	stringprepM p x = case SP.stringprep p SP.defaultFlags (TL.toStrict x) of
 		Left _ -> Nothing
-		Right y -> Just y
+		Right y -> Just (TL.fromStrict y)
 
-parseJID_ :: T.Text -> JID
+parseJID_ :: Text -> JID
 parseJID_ text = case parseJID text of
 	Just jid -> jid
 	Nothing -> error "Malformed JID"
 
-formatJID :: JID -> T.Text
+formatJID :: JID -> Text
 formatJID (JID node (Domain domain) resource) = formatted where
-	formatted = T.concat [node', domain, resource']
-	node' = maybe "" (\(Node x) -> T.append x "@") node
-	resource' = maybe "" (\(Resource x) -> T.append "/" x) resource
+	formatted = TL.concat [node', domain, resource']
+	node' = maybe "" (\(Node x) -> TL.append x "@") node
+	resource' = maybe "" (\(Resource x) -> TL.append "/" x) resource
 
 -- Similar to 'comparing'
 equaling :: Eq a => (b -> a) -> b -> b -> Bool
 equaling f x y = f x == f y
 
 -- multi-version 'text' compatibility
-textSpanBy :: (Char -> Bool) -> T.Text -> (T.Text, T.Text)
+textSpanBy :: (Char -> Bool) -> Text -> (Text, Text)
 #if MIN_VERSION_text(0,11,0)
-textSpanBy = T.span
+textSpanBy = TL.span
 #else
-textSpanBy = T.spanBy
+textSpanBy = TL.spanBy
 #endif

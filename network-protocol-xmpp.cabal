@@ -11,12 +11,12 @@ cabal-version: >=1.6
 category: Network
 stability: experimental
 bug-reports: mailto:jmillikin@gmail.com
-homepage: http://john-millikin.com/software/network-protocol-xmpp/
+homepage: https://john-millikin.com/software/hs-xmpp/
 tested-with: GHC==6.12.1
 
 source-repository head
   type: bazaar
-  location: http://john-millikin.com/software/network-protocol-xmpp/
+  location: https://john-millikin.com/software/hs-xmpp/
 
 library
   ghc-options: -Wall

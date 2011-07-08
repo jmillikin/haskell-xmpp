@@ -29,10 +29,7 @@ module Network.Protocol.XMPP.XML
 	, Network.Protocol.XMPP.XML.attributeText
 	
 	-- * Constructors
-	, name
-	, nsname
 	, element
-	, nselement
 	
 	-- * Misc
 	, getattr
@@ -65,12 +62,6 @@ contentText :: Content -> TL.Text
 contentText (ContentText t) = TL.fromStrict t
 contentText (ContentEntity e) = TL.concat ["&", TL.fromStrict e, ";"]
 
-name :: TL.Text -> Name
-name t = Name (TL.toStrict t) Nothing Nothing
-
-nsname :: TL.Text -> TL.Text -> Name
-nsname ns n = Name (TL.toStrict n) (Just (TL.toStrict ns)) Nothing
-
 escape :: TL.Text -> TL.Text
 escape = TL.concatMap escapeChar where
 	escapeChar c = case c of
@@ -85,16 +76,12 @@ escapeContent :: Content -> TL.Text
 escapeContent (ContentText t) = escape (TL.fromStrict t)
 escapeContent (ContentEntity e) = TL.concat ["&", escape (TL.fromStrict e), ";"]
 
-element :: TL.Text -> [(TL.Text, TL.Text)] -> [Node] -> Element
-element elemName attrs children = Element (name elemName) attrs' children where
+element :: Name -> [(Name, TL.Text)] -> [Node] -> Element
+element name attrs children = Element name attrs' children where
 	attrs' = map (uncurry mkattr) attrs
 
-nselement :: TL.Text -> TL.Text -> [(TL.Text, TL.Text)] -> [Node] -> Element
-nselement ns ln attrs children = Element (nsname ns ln) attrs' children where
-	attrs' = map (uncurry mkattr) attrs
-
-mkattr :: TL.Text -> TL.Text -> (Name, [Content])
-mkattr n val = (name n, [ContentText (TL.toStrict val)])
+mkattr :: Name -> TL.Text -> (Name, [Content])
+mkattr n val = (n, [ContentText (TL.toStrict val)])
 
 -- A somewhat primitive serialisation function
 --

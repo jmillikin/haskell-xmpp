@@ -67,7 +67,7 @@ parseStreamID (X.BeginElement _ attrs) = sid where
 		(x:_) -> Just . X.attributeText $ x
 		_ -> Nothing
 	idAttrs = filter (matchingName . X.attributeName) attrs
-	matchingName = (== X.Name "jid" (Just "jabber:component:accept") Nothing)
+	matchingName = (== "{jabber:component:accept}jid")
 parseStreamID _ = Nothing
 
 authenticate :: T.Text -> T.Text -> M.XMPP ()
@@ -76,7 +76,7 @@ authenticate streamID password = do
 	let digest = showDigest $ sha1 bytes
 	M.putElement $ X.element "handshake" [] [X.NodeContent $ X.ContentText digest]
 	result <- M.getElement
-	let nameHandshake = X.Name "handshake" (Just "jabber:component:accept") Nothing
+	let nameHandshake = "{jabber:component:accept}handshake"
 	when (null (X.isNamed nameHandshake result)) $
 		throwError M.AuthenticationFailure
 

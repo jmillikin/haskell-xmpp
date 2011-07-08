@@ -184,7 +184,7 @@ emptyIQ t = IQ
 	, iqPayload = Nothing
 	}
 
-stanzaToElement' :: Stanza a => a -> T.Text -> T.Text -> X.Element
+stanzaToElement' :: Stanza a => a -> X.Name -> T.Text -> X.Element
 stanzaToElement' stanza name typeStr = X.element name attrs payloads where
 	payloads = map X.NodeElement $ stanzaPayloads stanza
 	attrs = concat
@@ -212,7 +212,7 @@ elementToStanza ns elemt = do
 
 parseMessage :: X.Element -> Maybe Message
 parseMessage elemt = do
-	typeStr <- X.getattr (X.name "type") elemt
+	typeStr <- X.getattr "type" elemt
 	msgType <- case typeStr of
 		"normal"    -> Just MessageNormal
 		"chat"      -> Just MessageChat
@@ -222,14 +222,14 @@ parseMessage elemt = do
 		_           -> Nothing
 	msgTo <- xmlJID "to" elemt
 	msgFrom <- xmlJID "from" elemt
-	let msgID = X.getattr (X.name "id") elemt
-	let msgLang = X.getattr (X.name "lang") elemt
+	let msgID = X.getattr "id" elemt
+	let msgLang = X.getattr "lang" elemt
 	let payloads = X.elementChildren elemt
 	return $ Message msgType msgTo msgFrom msgID msgLang payloads
 
 parsePresence :: X.Element -> Maybe Presence
 parsePresence elemt = do
-	let typeStr = maybe "" id $ X.getattr (X.name "type") elemt
+	let typeStr = maybe "" id $ X.getattr "type" elemt
 	pType <- case typeStr of
 		""             -> Just PresenceAvailable
 		"unavailable"  -> Just PresenceUnavailable
@@ -243,14 +243,14 @@ parsePresence elemt = do
 		
 	msgTo <- xmlJID "to" elemt
 	msgFrom <- xmlJID "from" elemt
-	let msgID = X.getattr (X.name "id") elemt
-	let msgLang = X.getattr (X.name "lang") elemt
+	let msgID = X.getattr "id" elemt
+	let msgLang = X.getattr "lang" elemt
 	let payloads = X.elementChildren elemt
 	return $ Presence pType msgTo msgFrom msgID msgLang payloads
 
 parseIQ :: X.Element -> Maybe IQ
 parseIQ elemt = do
-	typeStr <- X.getattr (X.name "type") elemt
+	typeStr <- X.getattr "type" elemt
 	iqType <- case typeStr of
 		"get"    -> Just IQGet
 		"set"    -> Just IQSet
@@ -260,15 +260,15 @@ parseIQ elemt = do
 	
 	msgTo <- xmlJID "to" elemt
 	msgFrom <- xmlJID "from" elemt
-	let msgID = X.getattr (X.name "id") elemt
-	let msgLang = X.getattr (X.name "lang") elemt
+	let msgID = X.getattr "id" elemt
+	let msgLang = X.getattr "lang" elemt
 	let payload = case X.elementChildren elemt of
 		[] -> Nothing
 		child:_ -> Just child
 	return $ IQ iqType msgTo msgFrom msgID msgLang payload
 
-xmlJID :: T.Text -> X.Element -> Maybe (Maybe JID)
-xmlJID name elemt = case X.getattr (X.name name) elemt of
+xmlJID :: X.Name -> X.Element -> Maybe (Maybe JID)
+xmlJID name elemt = case X.getattr name elemt of
 	Nothing -> Just Nothing
 	Just raw -> case parseJID raw of
 		Just jid -> Just (Just jid)

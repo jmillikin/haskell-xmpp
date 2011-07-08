@@ -96,7 +96,7 @@ bindJID jid = do
 	bindResult <- M.getStanza
 	let getJID =
 		X.elementChildren
-		>=> X.isNamed (X.Name "jid" (Just "urn:ietf:params:xml:ns:xmpp-bind") Nothing)
+		>=> X.isNamed "{urn:ietf:params:xml:ns:xmpp-bind}jid"
 		>=> X.elementNodes
 		>=> X.isContent
 		>=> return . X.contentText
@@ -126,7 +126,7 @@ bindJID jid = do
 
 bindStanza :: Maybe J.Resource -> IQ
 bindStanza resource = (emptyIQ IQSet) { iqPayload = Just payload } where
-	payload = X.nselement "urn:ietf:params:xml:ns:xmpp-bind" "bind" [] requested
+	payload = X.element "{urn:ietf:params:xml:ns:xmpp-bind}bind" [] requested
 	requested = case fmap J.strResource resource of
 		Nothing -> []
 		Just x -> [X.NodeElement $ X.element "resource" []
@@ -134,7 +134,7 @@ bindStanza resource = (emptyIQ IQSet) { iqPayload = Just payload } where
 
 sessionStanza :: IQ
 sessionStanza = (emptyIQ IQSet) { iqPayload = Just payload } where
-	payload = X.nselement "urn:ietf:params:xml:ns:xmpp-session" "session" [] []
+	payload = X.element "{urn:ietf:params:xml:ns:xmpp-session}session" [] []
 
 streamSupportsTLS :: [F.Feature] -> Bool
 streamSupportsTLS = any isStartTLS where
@@ -142,7 +142,7 @@ streamSupportsTLS = any isStartTLS where
 	isStartTLS _                     = False
 
 xmlStartTLS :: X.Element
-xmlStartTLS = X.nselement "urn:ietf:params:xml:ns:xmpp-tls" "starttls" [] []
+xmlStartTLS = X.element "{urn:ietf:params:xml:ns:xmpp-tls}starttls" [] []
 
 void :: Monad m => m a -> m ()
 void m = m >> return ()

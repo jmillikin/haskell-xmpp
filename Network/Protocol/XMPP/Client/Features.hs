@@ -64,7 +64,7 @@ parseFeatureSASL e = FeatureSASL $
 	>>= return . B.pack . TL.unpack . X.contentText
 
 nameMechanism :: X.Name
-nameMechanism = X.Name "mechanism" (Just "urn:ietf:params:xml:ns:xmpp-sasl") Nothing
+nameMechanism = "{urn:ietf:params:xml:ns:xmpp-sasl}mechanism"
 
 nameFeatures :: X.Name
-nameFeatures = X.Name "features" (Just "http://etherx.jabber.org/streams") Nothing
+nameFeatures = "{http://etherx.jabber.org/streams}features"

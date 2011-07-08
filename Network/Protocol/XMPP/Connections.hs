@@ -56,4 +56,4 @@ startOfStream depth event = case (depth, event) of
 	_ -> False
 
 qnameStream :: X.Name
-qnameStream = X.Name "stream" (Just "http://etherx.jabber.org/streams") Nothing
+qnameStream = "{http://etherx.jabber.org/streams}stream"

@@ -25,8 +25,11 @@ module Network.Protocol.XMPP.Handle
 import           Control.Monad (when)
 import qualified Control.Monad.Error as E
 import           Control.Monad.Trans (liftIO)
-import qualified Data.ByteString.Lazy as B
-import qualified Data.Text.Lazy as T
+import qualified Data.ByteString
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Lazy
+import qualified Data.Text
+import           Data.Text (Text)
 import qualified System.IO as IO
 import qualified Network.Protocol.TLS.GNU as TLS
 import           Network.Protocol.XMPP.ErrorT
@@ -35,17 +38,17 @@ data Handle =
 	  PlainHandle IO.Handle
 	| SecureHandle IO.Handle TLS.Session
 
-liftTLS :: TLS.Session -> TLS.TLS a -> ErrorT T.Text IO a
+liftTLS :: TLS.Session -> TLS.TLS a -> ErrorT Text IO a
 liftTLS s = liftTLS' . TLS.runTLS s
 
-liftTLS' :: IO (Either TLS.Error a) -> ErrorT T.Text IO a
+liftTLS' :: IO (Either TLS.Error a) -> ErrorT Text IO a
 liftTLS' io = do
 	eitherX <- liftIO io
 	case eitherX of
-		Left err -> E.throwError $ T.pack $ show err
+		Left err -> E.throwError $ Data.Text.pack $ show err
 		Right x -> return x
 
-startTLS :: Handle -> ErrorT T.Text IO Handle
+startTLS :: Handle -> ErrorT Text IO Handle
 startTLS (SecureHandle _ _) = E.throwError "Can't start TLS on a secure handle"
 startTLS (PlainHandle h) = liftTLS' $ TLS.runClient (TLS.handleTransport h) $ do
 	TLS.setPriority [TLS.X509]
@@ -53,14 +56,16 @@ startTLS (PlainHandle h) = liftTLS' $ TLS.runClient (TLS.handleTransport h) $ do
 	TLS.handshake
 	SecureHandle h `fmap` TLS.getSession
 
-hPutBytes :: Handle -> B.ByteString -> ErrorT T.Text IO ()
-hPutBytes (PlainHandle h)  = liftIO . B.hPut h
-hPutBytes (SecureHandle _ s) = liftTLS s . TLS.putBytes
+hPutBytes :: Handle -> ByteString -> ErrorT Text IO ()
+hPutBytes (PlainHandle h)  = liftIO . Data.ByteString.hPut h
+hPutBytes (SecureHandle _ s) = liftTLS s . TLS.putBytes . toLazy where
+	toLazy bytes = Data.ByteString.Lazy.fromChunks [bytes]
 
-hGetBytes :: Handle -> Integer -> ErrorT T.Text IO B.ByteString
-hGetBytes (PlainHandle h) n = liftIO $  B.hGet h $ fromInteger n
+hGetBytes :: Handle -> Integer -> ErrorT Text IO ByteString
+hGetBytes (PlainHandle h) n = liftIO $ Data.ByteString.hGet h $ fromInteger n
 hGetBytes (SecureHandle h s) n = liftTLS s $ do
 	pending <- TLS.checkPending
 	let wait = IO.hWaitForInput h (- 1) >> return ()
 	when (pending == 0) (liftIO wait)
-	TLS.getBytes n
+	lazy <- TLS.getBytes n
+	return (Data.ByteString.concat (Data.ByteString.Lazy.toChunks lazy))

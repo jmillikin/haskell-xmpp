@@ -43,9 +43,10 @@ import           Control.Monad.Fix (MonadFix, mfix)
 import           Control.Monad.Trans (MonadIO, liftIO)
 import qualified Control.Monad.Error as E
 import qualified Control.Monad.Reader as R
-import qualified Data.ByteString.Lazy.Char8 as B
-import           Data.Text.Lazy (Text)
-import           Data.Text.Lazy.Encoding (encodeUtf8)
+import qualified Data.ByteString
+import           Data.ByteString (ByteString)
+import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
 
 import           Network.Protocol.XMPP.ErrorT
 import qualified Network.Protocol.XMPP.Handle as H
@@ -145,7 +146,7 @@ liftTLS io = do
 		Left err -> E.throwError $ TransportError err
 		Right x -> return x
 
-putBytes :: B.ByteString -> XMPP ()
+putBytes :: ByteString -> XMPP ()
 putBytes bytes = do
 	h <- getHandle
 	liftTLS $ H.hPutBytes h bytes
@@ -163,7 +164,7 @@ readEvents done = xmpp where
 		let nextEvents = do
 			-- TODO: read in larger increments
 			bytes <- liftTLS $ H.hGetBytes h 1
-			let eof = B.length bytes == 0
+			let eof = Data.ByteString.length bytes == 0
 			parsed <- liftIO $ X.parse p bytes eof
 			case parsed of
 				Left err -> E.throwError $ TransportError err

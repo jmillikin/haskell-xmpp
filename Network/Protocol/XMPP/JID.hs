@@ -27,8 +27,8 @@ module Network.Protocol.XMPP.JID
 	, formatJID
 	) where
 
-import qualified Data.Text.Lazy as TL
-import           Data.Text.Lazy (Text)
+import qualified Data.Text
+import           Data.Text (Text)
 import qualified Data.Text.IDN.StringPrep as SP
 import           Data.String (IsString, fromString)
 
@@ -74,14 +74,14 @@ instance IsString JID where
 parseJID :: Text -> Maybe JID
 parseJID str = maybeJID where
 	(node, postNode) = case textSpanBy (/= '@') str of
-		(x, y) -> if TL.null y
+		(x, y) -> if Data.Text.null y
 			then ("", x)
-			else (x, TL.drop 1 y)
+			else (x, Data.Text.drop 1 y)
 	(domain, resource) = case textSpanBy (/= '/') postNode of
-		(x, y) -> if TL.null y
+		(x, y) -> if Data.Text.null y
 			then (x, "")
-			else (x, TL.drop 1 y)
-	nullable x f = if TL.null x then Just Nothing else fmap Just $ f x
+			else (x, Data.Text.drop 1 y)
+	nullable x f = if Data.Text.null x then Just Nothing else fmap Just $ f x
 	maybeJID = do
 		preppedNode <- nullable node $ stringprepM SP.xmppNode
 		preppedDomain <- stringprepM SP.nameprep domain
@@ -90,9 +90,9 @@ parseJID str = maybeJID where
 			(fmap Node preppedNode)
 			(Domain preppedDomain)
 			(fmap Resource preppedResource)
-	stringprepM p x = case SP.stringprep p SP.defaultFlags (TL.toStrict x) of
+	stringprepM p x = case SP.stringprep p SP.defaultFlags x of
 		Left _ -> Nothing
-		Right y -> Just (TL.fromStrict y)
+		Right y -> Just y
 
 parseJID_ :: Text -> JID
 parseJID_ text = case parseJID text of
@@ -101,9 +101,9 @@ parseJID_ text = case parseJID text of
 
 formatJID :: JID -> Text
 formatJID (JID node (Domain domain) resource) = formatted where
-	formatted = TL.concat [node', domain, resource']
-	node' = maybe "" (\(Node x) -> TL.append x "@") node
-	resource' = maybe "" (\(Resource x) -> TL.append "/" x) resource
+	formatted = Data.Text.concat [node', domain, resource']
+	node' = maybe "" (\(Node x) -> Data.Text.append x "@") node
+	resource' = maybe "" (\(Resource x) -> Data.Text.append "/" x) resource
 
 -- Similar to 'comparing'
 equaling :: Eq a => (b -> a) -> b -> b -> Bool
@@ -112,7 +112,7 @@ equaling f x y = f x == f y
 -- multi-version 'text' compatibility
 textSpanBy :: (Char -> Bool) -> Text -> (Text, Text)
 #if MIN_VERSION_text(0,11,0)
-textSpanBy = TL.span
+textSpanBy = Data.Text.span
 #else
-textSpanBy = TL.spanBy
+textSpanBy = Data.Text.spanBy
 #endif

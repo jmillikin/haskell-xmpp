@@ -23,9 +23,10 @@ module Network.Protocol.XMPP.Connections
 	) where
 
 import           Network (HostName, PortID)
-import qualified Data.ByteString.Lazy as B
-import qualified Data.Text.Lazy as T
-import           Data.Text.Lazy.Encoding (encodeUtf8)
+import           Data.ByteString (ByteString)
+import qualified Data.Text
+import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
 
 import qualified Network.Protocol.XMPP.XML as X
 import           Network.Protocol.XMPP.JID (JID, formatJID)
@@ -39,10 +40,10 @@ data Server = Server
 -- Since only the opening tag should be written, normal XML
 -- serialization cannot be used. Be careful to escape any embedded
 -- attributes.
-xmlHeader :: T.Text -> JID -> B.ByteString
+xmlHeader :: Text -> JID -> ByteString
 xmlHeader ns jid = encodeUtf8 header where
-	attr x = T.concat ["\"", X.escape x, "\""]
-	header = T.concat
+	attr x = Data.Text.concat ["\"", X.escape x, "\""]
+	header = Data.Text.concat
 		[ "<?xml version='1.0'?>\n"
 		, "<stream:stream xmlns=" , attr ns
 		, " to=", attr (formatJID jid)

@@ -24,11 +24,11 @@ import           Control.Monad (when)
 import           Control.Monad.Error (throwError)
 import           Data.Bits (shiftR, (.&.))
 import           Data.Char (intToDigit)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString
+import           Data.ByteString (ByteString)
 import qualified Data.Text
-import qualified Data.Text.Lazy as T
-import qualified Data.Text.Lazy.Encoding as TE
+import           Data.Text (Text)
+import           Data.Text.Encoding (encodeUtf8)
 import           Network (connectTo)
 import           Network.Protocol.SASL.GNU (sha1)
 import qualified System.IO as IO
@@ -40,7 +40,7 @@ import qualified Network.Protocol.XMPP.XML as X
 import           Network.Protocol.XMPP.JID (JID)
 
 runComponent :: C.Server
-             -> T.Text -- ^ Server secret
+             -> Text -- ^ Server secret
              -> M.XMPP a
              -> IO (Either M.Error a)
 runComponent server password xmpp = do
@@ -53,7 +53,7 @@ runComponent server password xmpp = do
 		authenticate streamID password
 		xmpp
 
-beginStream :: JID -> M.XMPP T.Text
+beginStream :: JID -> M.XMPP Text
 beginStream jid = do
 	M.putBytes $ C.xmlHeader "jabber:component:accept" jid
 	events <- M.readEvents C.startOfStream
@@ -61,16 +61,13 @@ beginStream jid = do
 		Nothing -> throwError M.NoComponentStreamID
 		Just x -> return x
 
-parseStreamID :: X.SaxEvent -> Maybe T.Text
-parseStreamID (X.BeginElement _ attrs) = sid where
-	sid = case idAttrs of
-		(x:_) -> Just . X.attributeText $ x
-		_ -> Nothing
-	idAttrs = filter (matchingName . X.attributeName) attrs
-	matchingName = (== "{jabber:component:accept}jid")
+parseStreamID :: X.SaxEvent -> Maybe Text
+parseStreamID (X.BeginElement name attrs) = X.attributeText
+	"{jabber:component:accept}jid"
+	(X.Element name attrs [])
 parseStreamID _ = Nothing
 
-authenticate :: T.Text -> T.Text -> M.XMPP ()
+authenticate :: Text -> Text -> M.XMPP ()
 authenticate streamID password = do
 	let bytes = buildSecret streamID password
 	let digest = showDigest $ sha1 bytes
@@ -80,11 +77,10 @@ authenticate streamID password = do
 	when (null (X.isNamed nameHandshake result)) $
 		throwError M.AuthenticationFailure
 
-buildSecret :: T.Text -> T.Text -> B.ByteString
-buildSecret sid password = B.concat . BL.toChunks $ bytes where
-	bytes = TE.encodeUtf8 $ X.escape $ T.append sid password
+buildSecret :: Text -> Text -> ByteString
+buildSecret sid password = encodeUtf8 (X.escape (Data.Text.append sid password))
 
-showDigest :: B.ByteString -> Data.Text.Text
-showDigest = Data.Text.pack . concatMap wordToHex . B.unpack where
+showDigest :: ByteString -> Text
+showDigest = Data.Text.pack . concatMap wordToHex . Data.ByteString.unpack where
 	wordToHex x = [hexDig $ shiftR x 4, hexDig $ x .&. 0xF]
 	hexDig = intToDigit . fromIntegral

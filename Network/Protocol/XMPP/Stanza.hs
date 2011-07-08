@@ -34,15 +34,16 @@ module Network.Protocol.XMPP.Stanza
 	) where
 
 import           Control.Monad (when)
-import qualified Data.Text.Lazy as T
+import qualified Data.Text
+import           Data.Text (Text)
 import qualified Network.Protocol.XMPP.XML as X
 import           Network.Protocol.XMPP.JID (JID, parseJID, formatJID)
 
 class Stanza a where
 	stanzaTo        :: a -> Maybe JID
 	stanzaFrom      :: a -> Maybe JID
-	stanzaID        :: a -> Maybe T.Text
-	stanzaLang      :: a -> Maybe T.Text
+	stanzaID        :: a -> Maybe Text
+	stanzaLang      :: a -> Maybe Text
 	stanzaPayloads  :: a -> [X.Element]
 	stanzaToElement :: a -> X.Element
 
@@ -56,8 +57,8 @@ data Message = Message
 	{ messageType     :: MessageType
 	, messageTo       :: Maybe JID
 	, messageFrom     :: Maybe JID
-	, messageID       :: Maybe T.Text
-	, messageLang     :: Maybe T.Text
+	, messageID       :: Maybe Text
+	, messageLang     :: Maybe Text
 	, messagePayloads :: [X.Element]
 	}
 	deriving (Show)
@@ -98,8 +99,8 @@ data Presence = Presence
 	{ presenceType     :: PresenceType
 	, presenceTo       :: Maybe JID
 	, presenceFrom     :: Maybe JID
-	, presenceID       :: Maybe T.Text
-	, presenceLang     :: Maybe T.Text
+	, presenceID       :: Maybe Text
+	, presenceLang     :: Maybe Text
 	, presencePayloads :: [X.Element]
 	}
 	deriving (Show)
@@ -146,8 +147,8 @@ data IQ = IQ
 	{ iqType    :: IQType
 	, iqTo      :: Maybe JID
 	, iqFrom    :: Maybe JID
-	, iqID      :: Maybe T.Text
-	, iqLang    :: Maybe T.Text
+	, iqID      :: Maybe Text
+	, iqLang    :: Maybe Text
 	, iqPayload :: Maybe X.Element
 	}
 	deriving (Show)
@@ -184,7 +185,7 @@ emptyIQ t = IQ
 	, iqPayload = Nothing
 	}
 
-stanzaToElement' :: Stanza a => a -> X.Name -> T.Text -> X.Element
+stanzaToElement' :: Stanza a => a -> X.Name -> Text -> X.Element
 stanzaToElement' stanza name typeStr = X.element name attrs payloads where
 	payloads = map X.NodeElement $ stanzaPayloads stanza
 	attrs = concat
@@ -192,13 +193,13 @@ stanzaToElement' stanza name typeStr = X.element name attrs payloads where
 		, mattr "from" $ fmap formatJID . stanzaFrom
 		, mattr "id" stanzaID
 		, mattr "xml:lang" stanzaLang
-		, if T.null typeStr then [] else [("type", typeStr)]
+		, if Data.Text.null typeStr then [] else [("type", typeStr)]
 		]
 	mattr label f = case f stanza of
 		Nothing -> []
 		Just text -> [(label, text)]
 
-elementToStanza :: T.Text -> X.Element -> Maybe ReceivedStanza
+elementToStanza :: Text -> X.Element -> Maybe ReceivedStanza
 elementToStanza ns elemt = do
 	let elemNS = X.nameNamespace . X.elementName $ elemt
 	when (elemNS /= Just ns) Nothing
@@ -212,7 +213,7 @@ elementToStanza ns elemt = do
 
 parseMessage :: X.Element -> Maybe Message
 parseMessage elemt = do
-	typeStr <- X.getattr "type" elemt
+	typeStr <- X.attributeText "type" elemt
 	msgType <- case typeStr of
 		"normal"    -> Just MessageNormal
 		"chat"      -> Just MessageChat
@@ -222,14 +223,14 @@ parseMessage elemt = do
 		_           -> Nothing
 	msgTo <- xmlJID "to" elemt
 	msgFrom <- xmlJID "from" elemt
-	let msgID = X.getattr "id" elemt
-	let msgLang = X.getattr "lang" elemt
+	let msgID = X.attributeText "id" elemt
+	let msgLang = X.attributeText "lang" elemt
 	let payloads = X.elementChildren elemt
 	return $ Message msgType msgTo msgFrom msgID msgLang payloads
 
 parsePresence :: X.Element -> Maybe Presence
 parsePresence elemt = do
-	let typeStr = maybe "" id $ X.getattr "type" elemt
+	let typeStr = maybe "" id $ X.attributeText "type" elemt
 	pType <- case typeStr of
 		""             -> Just PresenceAvailable
 		"unavailable"  -> Just PresenceUnavailable
@@ -243,14 +244,14 @@ parsePresence elemt = do
 		
 	msgTo <- xmlJID "to" elemt
 	msgFrom <- xmlJID "from" elemt
-	let msgID = X.getattr "id" elemt
-	let msgLang = X.getattr "lang" elemt
+	let msgID = X.attributeText "id" elemt
+	let msgLang = X.attributeText "lang" elemt
 	let payloads = X.elementChildren elemt
 	return $ Presence pType msgTo msgFrom msgID msgLang payloads
 
 parseIQ :: X.Element -> Maybe IQ
 parseIQ elemt = do
-	typeStr <- X.getattr "type" elemt
+	typeStr <- X.attributeText "type" elemt
 	iqType <- case typeStr of
 		"get"    -> Just IQGet
 		"set"    -> Just IQSet
@@ -260,15 +261,15 @@ parseIQ elemt = do
 	
 	msgTo <- xmlJID "to" elemt
 	msgFrom <- xmlJID "from" elemt
-	let msgID = X.getattr "id" elemt
-	let msgLang = X.getattr "lang" elemt
+	let msgID = X.attributeText "id" elemt
+	let msgLang = X.attributeText "lang" elemt
 	let payload = case X.elementChildren elemt of
 		[] -> Nothing
 		child:_ -> Just child
 	return $ IQ iqType msgTo msgFrom msgID msgLang payload
 
 xmlJID :: X.Name -> X.Element -> Maybe (Maybe JID)
-xmlJID name elemt = case X.getattr name elemt of
+xmlJID name elemt = case X.attributeText name elemt of
 	Nothing -> Just Nothing
 	Just raw -> case parseJID raw of
 		Just jid -> Just (Just jid)

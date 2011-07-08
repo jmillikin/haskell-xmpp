@@ -16,23 +16,12 @@
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 module Network.Protocol.XMPP.XML
-	( Element(..)
-	, Node(..)
-	, Content(..)
-	, Name(Name)
-	, Network.Protocol.XMPP.XML.nameNamespace
-	, Network.Protocol.XMPP.XML.nameLocalName
-	, isNamed
-	, elementChildren
-	, isContent
-	, attributeName
-	, Network.Protocol.XMPP.XML.attributeText
+	( module Data.XML.Types
 	
 	-- * Constructors
 	, element
 	
 	-- * Misc
-	, getattr
 	, contentText
 	, escape
 	, serialiseElement
@@ -48,78 +37,61 @@ module Network.Protocol.XMPP.XML
 	) where
 
 import           Control.Monad (when)
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Lazy as BL
-import qualified Data.Text.Lazy as TL
-import           Data.XML.Types as X
+import           Data.ByteString (ByteString)
+import qualified Data.Text
+import           Data.Text (Text)
+import           Data.XML.Types
 import           Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import qualified Text.XML.LibXML.SAX as SAX
 
-getattr :: Name -> Element -> Maybe TL.Text
-getattr n e = fmap TL.fromStrict (X.attributeText n e)
+contentText :: Content -> Text
+contentText (ContentText t) = t
+contentText (ContentEntity e) = Data.Text.concat ["&", e, ";"]
 
-contentText :: Content -> TL.Text
-contentText (ContentText t) = TL.fromStrict t
-contentText (ContentEntity e) = TL.concat ["&", TL.fromStrict e, ";"]
-
-escape :: TL.Text -> TL.Text
-escape = TL.concatMap escapeChar where
+escape :: Text -> Text
+escape = Data.Text.concatMap escapeChar where
 	escapeChar c = case c of
 		'&' -> "&amp;"
 		'<' -> "&lt;"
 		'>' -> "&gt;"
 		'"' -> "&quot;"
 		'\'' -> "&apos;"
-		_ -> TL.singleton c
+		_ -> Data.Text.singleton c
 
-escapeContent :: Content -> TL.Text
-escapeContent (ContentText t) = escape (TL.fromStrict t)
-escapeContent (ContentEntity e) = TL.concat ["&", escape (TL.fromStrict e), ";"]
+escapeContent :: Content -> Text
+escapeContent (ContentText t) = escape t
+escapeContent (ContentEntity e) = Data.Text.concat ["&", escape e, ";"]
 
-element :: Name -> [(Name, TL.Text)] -> [Node] -> Element
+element :: Name -> [(Name, Text)] -> [Node] -> Element
 element name attrs children = Element name attrs' children where
 	attrs' = map (uncurry mkattr) attrs
 
-mkattr :: Name -> TL.Text -> (Name, [Content])
-mkattr n val = (n, [ContentText (TL.toStrict val)])
+mkattr :: Name -> Text -> (Name, [Content])
+mkattr n val = (n, [ContentText val])
 
 -- A somewhat primitive serialisation function
 --
 -- TODO: better namespace / prefix handling
-serialiseElement :: Element -> TL.Text
+serialiseElement :: Element -> Text
 serialiseElement e = text where
-	text = TL.concat ["<", eName, " ", attrs, ">", contents, "</", eName, ">"]
+	text = Data.Text.concat ["<", eName, " ", attrs, ">", contents, "</", eName, ">"]
 	eName = formatName $ elementName e
-	formatName = escape . TL.fromStrict . X.nameLocalName
-	attrs = TL.intercalate " " $ map attr $ elementAttributes e ++ nsattr
-	attr (n, c) = TL.concat $ [formatName n, "=\""] ++ map escapeContent c ++ ["\""]
-	nsattr = case X.nameNamespace $ elementName e of
+	formatName = escape . nameLocalName
+	attrs = Data.Text.intercalate " " $ map attr $ elementAttributes e ++ nsattr
+	attr (n, c) = Data.Text.concat $ [formatName n, "=\""] ++ map escapeContent c ++ ["\""]
+	nsattr = case nameNamespace $ elementName e of
 		Nothing -> []
-		Just ns -> [mkattr "xmlns" (TL.fromStrict ns)]
-	contents = TL.concat $ map serialiseNode $ elementNodes e
+		Just ns -> [mkattr "xmlns" ns]
+	contents = Data.Text.concat $ map serialiseNode $ elementNodes e
 	
 	serialiseNode (NodeElement e') = serialiseElement e'
 	serialiseNode (NodeContent c) = escape (contentText c)
 	serialiseNode (NodeComment _) = ""
 	serialiseNode (NodeInstruction _) = ""
 
--- lazy wrappers around strict xml-types; avoids having to break the API just
--- to use xml-types 0.3
-nameNamespace :: Name -> Maybe TL.Text
-nameNamespace = fmap TL.fromStrict . X.nameNamespace
-
-nameLocalName :: Name -> TL.Text
-nameLocalName = TL.fromStrict . X.nameLocalName
-
-attributeName :: (Name, [Content]) -> Name
-attributeName = fst
-
-attributeText :: (Name, [Content]) -> TL.Text
-attributeText = TL.concat . map contentText . snd
-
 -- quick-and-dirty imitation of libxml-sax-0.4 API; later, this should
 -- probably be rewritten to use ST and discard the list parsing
-data Parser = Parser (SAX.Parser IO) (IORef (Either TL.Text [SaxEvent]))
+data Parser = Parser (SAX.Parser IO) (IORef (Either Text [SaxEvent]))
 
 newParser :: IO Parser
 newParser = do
@@ -135,17 +107,17 @@ newParser = do
 	
 	SAX.setCallback p SAX.parsedBeginElement (\name' attrs -> addEvent $ BeginElement name' attrs)
 	SAX.setCallback p SAX.parsedEndElement (\name' -> addEvent $ EndElement name')
-	SAX.setCallback p SAX.parsedCharacters (\txt -> addEvent $ Characters $ TL.fromStrict txt)
-	SAX.setCallback p SAX.parsedComment (\txt -> addEvent $ Comment $ TL.fromStrict txt)
+	SAX.setCallback p SAX.parsedCharacters (\txt -> addEvent $ Characters txt)
+	SAX.setCallback p SAX.parsedComment (\txt -> addEvent $ Comment txt)
 	SAX.setCallback p SAX.parsedInstruction (\i -> addEvent $ ProcessingInstruction i)
-	SAX.setCallback p SAX.reportError (\err -> writeIORef ref (Left $ TL.fromStrict err) >> return False)
+	SAX.setCallback p SAX.reportError (\err -> writeIORef ref (Left err) >> return False)
 	
 	return $ Parser p ref
 
-parse :: Parser -> BL.ByteString -> Bool -> IO (Either TL.Text [SaxEvent])
+parse :: Parser -> ByteString -> Bool -> IO (Either Text [SaxEvent])
 parse (Parser p ref) bytes finish = do
 	writeIORef ref (Right [])
-	SAX.parseBytes p (B.concat (BL.toChunks bytes))
+	SAX.parseBytes p bytes
 	when finish $ SAX.parseComplete p
 	eitherEvents <- readIORef ref
 	return $ case eitherEvents of
@@ -155,8 +127,8 @@ parse (Parser p ref) bytes finish = do
 data SaxEvent
 	= BeginElement Name [(Name, [Content])]
 	| EndElement Name
-	| Characters TL.Text
-	| Comment TL.Text
+	| Characters Text
+	| Comment Text
 	| ProcessingInstruction Instruction
 
 readEvents :: Monad m
@@ -182,7 +154,7 @@ readEvents done nextEvents = readEvents' 0 [] where
 			then (True, depth', reverse acc')
 			else step es depth' acc'
 
--- | Convert a list of events to a single 'X.Element'. If the events do not
+-- | Convert a list of events to a single 'Element'. If the events do not
 -- contain at least one valid element, 'Nothing' will be returned instead.
 eventsToElement :: [SaxEvent] -> Maybe Element
 eventsToElement es = case eventsToNodes es >>= isElement of
@@ -216,7 +188,7 @@ blockToNodes (begin:rest) = nodes where
 	end = last rest
 	nodes = case (begin, end) of
 		(BeginElement name' attrs, EndElement _) -> [node name' attrs]
-		(Characters t, _) -> [NodeContent (ContentText (TL.toStrict t))]
+		(Characters t, _) -> [NodeContent (ContentText t)]
 		_ -> []
 	
 	node n as = NodeElement $ Element n as $ eventsToNodes $ init rest

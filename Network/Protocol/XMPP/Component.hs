@@ -70,17 +70,16 @@ parseStreamID _ = Nothing
 authenticate :: Text -> Text -> M.XMPP ()
 authenticate streamID password = do
 	let bytes = buildSecret streamID password
-	let digest = showDigest $ sha1 bytes
-	M.putElement $ X.element "handshake" [] [X.NodeContent $ X.ContentText digest]
+	let digest = showDigest (sha1 bytes)
+	M.putElement (X.element "handshake" [] [X.NodeContent (X.ContentText digest)])
 	result <- M.getElement
 	let nameHandshake = "{jabber:component:accept}handshake"
-	when (null (X.isNamed nameHandshake result)) $
-		throwError M.AuthenticationFailure
+	when (null (X.isNamed nameHandshake result)) (throwError M.AuthenticationFailure)
 
 buildSecret :: Text -> Text -> ByteString
 buildSecret sid password = encodeUtf8 (X.escape (Data.Text.append sid password))
 
 showDigest :: ByteString -> Text
 showDigest = Data.Text.pack . concatMap wordToHex . Data.ByteString.unpack where
-	wordToHex x = [hexDig $ shiftR x 4, hexDig $ x .&. 0xF]
+	wordToHex x = [hexDig (shiftR x 4), hexDig (x .&. 0xF)]
 	hexDig = intToDigit . fromIntegral

@@ -61,7 +61,7 @@ runClient server jid username password xmpp = do
 
 newStream :: J.JID -> M.XMPP [F.Feature]
 newStream jid = do
-	M.putBytes $ C.xmlHeader "jabber:client" jid
+	M.putBytes (C.xmlHeader "jabber:client" jid)
 	void (M.readEvents C.startOfStream)
 	F.parseFeatures `fmap` M.getElement
 
@@ -72,10 +72,10 @@ tryTLS sjid features m
 		M.putElement xmlStartTLS
 		void M.getElement
 		h <- M.getHandle
-		eitherTLS <- liftIO $ runErrorT $ H.startTLS h
+		eitherTLS <- liftIO (runErrorT (H.startTLS h))
 		case eitherTLS of
-			Left err -> throwError $ M.TransportError err
-			Right tls -> M.restartXMPP (Just tls) $ newStream sjid >>= m
+			Left err -> throwError (M.TransportError err)
+			Right tls -> M.restartXMPP (Just tls) (newStream sjid >>= m)
 
 authenticationMechanisms :: [F.Feature] -> [ByteString]
 authenticationMechanisms = step where
@@ -92,7 +92,7 @@ authenticationMechanisms = step where
 bindJID :: J.JID -> M.XMPP J.JID
 bindJID jid = do
 	-- Bind
-	M.putStanza . bindStanza . J.jidResource $ jid
+	M.putStanza (bindStanza (J.jidResource jid))
 	bindResult <- M.getStanza
 	let getJID =
 		X.elementChildren
@@ -113,13 +113,13 @@ bindJID jid = do
 	
 	returnedJID <- case maybeJID of
 		Just x -> return x
-		Nothing -> throwError $ M.InvalidBindResult bindResult
+		Nothing -> throwError (M.InvalidBindResult bindResult)
 	
 	-- Session
 	M.putStanza sessionStanza
 	void M.getStanza
 	
-	M.putStanza $ emptyPresence PresenceAvailable
+	M.putStanza (emptyPresence PresenceAvailable)
 	void M.getStanza
 	
 	return returnedJID
@@ -129,8 +129,7 @@ bindStanza resource = (emptyIQ IQSet) { iqPayload = Just payload } where
 	payload = X.element "{urn:ietf:params:xml:ns:xmpp-bind}bind" [] requested
 	requested = case fmap J.strResource resource of
 		Nothing -> []
-		Just x -> [X.NodeElement $ X.element "resource" []
-			[X.NodeContent $ X.ContentText x]]
+		Just x -> [X.NodeElement (X.element "resource" [] [X.NodeContent (X.ContentText x)])]
 
 sessionStanza :: IQ
 sessionStanza = (emptyIQ IQSet) { iqPayload = Just payload } where

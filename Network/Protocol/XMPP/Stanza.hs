@@ -187,10 +187,10 @@ emptyIQ t = IQ
 
 stanzaToElement' :: Stanza a => a -> X.Name -> Text -> X.Element
 stanzaToElement' stanza name typeStr = X.element name attrs payloads where
-	payloads = map X.NodeElement $ stanzaPayloads stanza
+	payloads = map X.NodeElement (stanzaPayloads stanza)
 	attrs = concat
-		[ mattr "to" $ fmap formatJID . stanzaTo
-		, mattr "from" $ fmap formatJID . stanzaFrom
+		[ mattr "to" (fmap formatJID . stanzaTo)
+		, mattr "from" (fmap formatJID . stanzaFrom)
 		, mattr "id" stanzaID
 		, mattr "xml:lang" stanzaLang
 		, if Data.Text.null typeStr then [] else [("type", typeStr)]
@@ -201,10 +201,10 @@ stanzaToElement' stanza name typeStr = X.element name attrs payloads where
 
 elementToStanza :: Text -> X.Element -> Maybe ReceivedStanza
 elementToStanza ns elemt = do
-	let elemNS = X.nameNamespace . X.elementName $ elemt
+	let elemNS = X.nameNamespace (X.elementName elemt)
 	when (elemNS /= Just ns) Nothing
 	
-	let elemName = X.nameLocalName . X.elementName $ elemt
+	let elemName = X.nameLocalName (X.elementName elemt)
 	case elemName of
 		"message" -> ReceivedMessage `fmap` parseMessage elemt
 		"presence" -> ReceivedPresence `fmap` parsePresence elemt
@@ -226,11 +226,11 @@ parseMessage elemt = do
 	let msgID = X.attributeText "id" elemt
 	let msgLang = X.attributeText "lang" elemt
 	let payloads = X.elementChildren elemt
-	return $ Message msgType msgTo msgFrom msgID msgLang payloads
+	return (Message msgType msgTo msgFrom msgID msgLang payloads)
 
 parsePresence :: X.Element -> Maybe Presence
 parsePresence elemt = do
-	let typeStr = maybe "" id $ X.attributeText "type" elemt
+	let typeStr = maybe "" id (X.attributeText "type" elemt)
 	pType <- case typeStr of
 		""             -> Just PresenceAvailable
 		"unavailable"  -> Just PresenceUnavailable
@@ -247,7 +247,7 @@ parsePresence elemt = do
 	let msgID = X.attributeText "id" elemt
 	let msgLang = X.attributeText "lang" elemt
 	let payloads = X.elementChildren elemt
-	return $ Presence pType msgTo msgFrom msgID msgLang payloads
+	return (Presence pType msgTo msgFrom msgID msgLang payloads)
 
 parseIQ :: X.Element -> Maybe IQ
 parseIQ elemt = do
@@ -266,7 +266,7 @@ parseIQ elemt = do
 	let payload = case X.elementChildren elemt of
 		[] -> Nothing
 		child:_ -> Just child
-	return $ IQ iqType msgTo msgFrom msgID msgLang payload
+	return (IQ iqType msgTo msgFrom msgID msgLang payload)
 
 xmlJID :: X.Name -> X.Element -> Maybe (Maybe JID)
 xmlJID name elemt = case X.attributeText name elemt of

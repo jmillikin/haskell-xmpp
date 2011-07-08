@@ -90,7 +90,7 @@ instance Functor XMPP where
 
 instance Monad XMPP where
 	return = XMPP . return
-	m >>= f = XMPP $ unXMPP m >>= unXMPP . f
+	m >>= f = XMPP (unXMPP m >>= unXMPP . f)
 
 instance MonadIO XMPP where
 	liftIO = XMPP . liftIO
@@ -98,14 +98,14 @@ instance MonadIO XMPP where
 instance E.MonadError XMPP where
 	type E.ErrorType XMPP = Error
 	throwError = XMPP . E.throwError
-	catchError m h = XMPP $ E.catchError (unXMPP m) (unXMPP . h)
+	catchError m h = XMPP (E.catchError (unXMPP m) (unXMPP . h))
 
 instance A.Applicative XMPP where
 	pure = return
 	(<*>) = ap
 
 instance MonadFix XMPP where
-	mfix f = XMPP $ mfix $ unXMPP . f
+	mfix f = XMPP (mfix (unXMPP . f))
 
 runXMPP :: Session -> XMPP a -> IO (Either Error a)
 runXMPP s xmpp = R.runReaderT (runErrorT (unXMPP xmpp)) s
@@ -120,15 +120,15 @@ startXMPP h ns xmpp = do
 restartXMPP :: Maybe H.Handle -> XMPP a -> XMPP a
 restartXMPP newH xmpp = do
 	Session oldH ns _ readLock writeLock <- getSession
-	sax <- liftIO $ X.newParser
+	sax <- liftIO X.newParser
 	let s = Session (maybe oldH id newH) ns sax readLock writeLock
-	XMPP $ R.local (const s) (unXMPP xmpp)
+	XMPP (R.local (const s) (unXMPP xmpp))
 
 withLock :: (Session -> M.MVar ()) -> XMPP a -> XMPP a
 withLock getLock xmpp = do
 	s <- getSession
 	let mvar = getLock s
-	res <- liftIO $ M.withMVar mvar $ \_ -> runXMPP s xmpp
+	res <- liftIO (M.withMVar mvar (\_ -> runXMPP s xmpp))
 	case res of
 		Left err -> E.throwError err
 		Right x -> return x
@@ -141,15 +141,15 @@ getHandle = fmap sessionHandle getSession
 
 liftTLS :: ErrorT Text IO a -> XMPP a
 liftTLS io = do
-	res <- liftIO $ runErrorT io
+	res <- liftIO (runErrorT io)
 	case res of
-		Left err -> E.throwError $ TransportError err
+		Left err -> E.throwError (TransportError err)
 		Right x -> return x
 
 putBytes :: ByteString -> XMPP ()
 putBytes bytes = do
 	h <- getHandle
-	liftTLS $ H.hPutBytes h bytes
+	liftTLS (H.hPutBytes h bytes)
 
 putElement :: X.Element -> XMPP ()
 putElement = putBytes . encodeUtf8 . X.serialiseElement
@@ -163,11 +163,11 @@ readEvents done = xmpp where
 		Session h _ p _ _ <- getSession
 		let nextEvents = do
 			-- TODO: read in larger increments
-			bytes <- liftTLS $ H.hGetBytes h 1
-			let eof = Data.ByteString.length bytes == 0
-			parsed <- liftIO $ X.parse p bytes eof
+			bytes <- liftTLS (H.hGetBytes h 1)
+			let eof = Data.ByteString.null bytes
+			parsed <- liftIO (X.parse p bytes eof)
 			case parsed of
-				Left err -> E.throwError $ TransportError err
+				Left err -> E.throwError (TransportError err)
 				Right events -> return events
 		X.readEvents done nextEvents
 
@@ -177,7 +177,7 @@ getElement = xmpp where
 		events <- readEvents endOfTree
 		case X.eventsToElement events of
 			Just x -> return x
-			Nothing -> E.throwError $ TransportError "getElement: invalid event list"
+			Nothing -> E.throwError (TransportError "getElement: invalid event list")
 	
 	endOfTree 0 (X.EventEndElement _) = True
 	endOfTree _ _ = False
@@ -188,4 +188,4 @@ getStanza = withLock sessionReadLock $ do
 	Session _ ns _ _ _ <- getSession
 	case S.elementToStanza ns elemt of
 		Just x -> return x
-		Nothing -> E.throwError $ InvalidStanza elemt
+		Nothing -> E.throwError (InvalidStanza elemt)

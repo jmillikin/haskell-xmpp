@@ -45,7 +45,7 @@ liftTLS' :: IO (Either TLS.Error a) -> ErrorT Text IO a
 liftTLS' io = do
 	eitherX <- liftIO io
 	case eitherX of
-		Left err -> E.throwError $ Data.Text.pack $ show err
+		Left err -> E.throwError (Data.Text.pack (show err))
 		Right x -> return x
 
 startTLS :: Handle -> ErrorT Text IO Handle
@@ -62,7 +62,7 @@ hPutBytes (SecureHandle _ s) = liftTLS s . TLS.putBytes . toLazy where
 	toLazy bytes = Data.ByteString.Lazy.fromChunks [bytes]
 
 hGetBytes :: Handle -> Integer -> ErrorT Text IO ByteString
-hGetBytes (PlainHandle h) n = liftIO $ Data.ByteString.hGet h $ fromInteger n
+hGetBytes (PlainHandle h) n = liftIO (Data.ByteString.hGet h (fromInteger n))
 hGetBytes (SecureHandle h s) n = liftTLS s $ do
 	pending <- TLS.checkPending
 	let wait = IO.hWaitForInput h (- 1) >> return ()

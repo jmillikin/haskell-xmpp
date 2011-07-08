@@ -74,14 +74,14 @@ mkattr n val = (n, [ContentText val])
 serialiseElement :: Element -> Text
 serialiseElement e = text where
 	text = Data.Text.concat ["<", eName, " ", attrs, ">", contents, "</", eName, ">"]
-	eName = formatName $ elementName e
+	eName = formatName (elementName e)
 	formatName = escape . nameLocalName
-	attrs = Data.Text.intercalate " " $ map attr $ elementAttributes e ++ nsattr
-	attr (n, c) = Data.Text.concat $ [formatName n, "=\""] ++ map escapeContent c ++ ["\""]
+	attrs = Data.Text.intercalate " " (map attr (elementAttributes e ++ nsattr))
+	attr (n, c) = Data.Text.concat ([formatName n, "=\""] ++ map escapeContent c ++ ["\""])
 	nsattr = case nameNamespace $ elementName e of
 		Nothing -> []
 		Just ns -> [mkattr "xmlns" ns]
-	contents = Data.Text.concat $ map serialiseNode $ elementNodes e
+	contents = Data.Text.concat (map serialiseNode (elementNodes e))
 	
 	serialiseNode (NodeElement e') = serialiseElement e'
 	serialiseNode (NodeContent c) = escape (contentText c)
@@ -105,23 +105,23 @@ newParser = do
 		return True
 	
 	SAX.setCallback p SAX.parsedBeginElement (\name attrs -> addEvent (EventBeginElement name attrs))
-	SAX.setCallback p SAX.parsedEndElement (\name -> addEvent (EventEndElement name))
-	SAX.setCallback p SAX.parsedCharacters (\txt -> addEvent (EventContent (ContentText txt)))
-	SAX.setCallback p SAX.parsedComment (\txt -> addEvent (EventComment txt))
-	SAX.setCallback p SAX.parsedInstruction (\i -> addEvent (EventInstruction i))
+	SAX.setCallback p SAX.parsedEndElement (addEvent . EventEndElement)
+	SAX.setCallback p SAX.parsedCharacters (addEvent . EventContent . ContentText)
+	SAX.setCallback p SAX.parsedComment (addEvent . EventComment)
+	SAX.setCallback p SAX.parsedInstruction (addEvent . EventInstruction)
 	SAX.setCallback p SAX.reportError (\err -> writeIORef ref (Left err) >> return False)
 	
-	return $ Parser p ref
+	return (Parser p ref)
 
 parse :: Parser -> ByteString -> Bool -> IO (Either Text [Event])
 parse (Parser p ref) bytes finish = do
 	writeIORef ref (Right [])
 	SAX.parseBytes p bytes
-	when finish $ SAX.parseComplete p
+	when finish (SAX.parseComplete p)
 	eitherEvents <- readIORef ref
 	return $ case eitherEvents of
 		Left err -> Left err
-		Right events -> Right $ reverse events
+		Right events -> Right (reverse events)
 
 readEvents :: Monad m
            => (Integer -> Event -> Bool)
@@ -183,4 +183,4 @@ blockToNodes (begin:rest) = nodes where
 		(EventContent c, _) -> [NodeContent c]
 		_ -> []
 	
-	node n as = NodeElement $ Element n as $ eventsToNodes $ init rest
+	node n as = NodeElement (Element n as (eventsToNodes (init rest)))

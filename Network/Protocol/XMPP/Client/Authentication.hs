@@ -1,4 +1,7 @@
--- Copyright (C) 2009-2010 John Millikin <jmillikin@gmail.com>
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+
+-- Copyright (C) 2009-2011 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -13,26 +16,25 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE DeriveDataTypeable #-}
 module Network.Protocol.XMPP.Client.Authentication
 	( Result (..)
 	, authenticate
 	) where
+
 import qualified Control.Exception as Exc
-import Control.Monad (when, (>=>))
-import Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad (when, (>=>))
+import           Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Control.Monad.Error as E
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Lazy as TL
-import Data.Typeable (Typeable)
+import           Data.Typeable (Typeable)
 import qualified Network.Protocol.SASL.GNU as SASL
 
 import qualified Network.Protocol.XMPP.Monad as M
 import qualified Network.Protocol.XMPP.XML as X
-import Network.Protocol.XMPP.JID (JID, formatJID, jidResource)
+import           Network.Protocol.XMPP.JID (JID, formatJID, jidResource)
 
 data Result = Success | Failure
 	deriving (Show, Eq)

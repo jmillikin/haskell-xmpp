@@ -1,4 +1,7 @@
--- Copyright (C) 2010 John Millikin <jmillikin@gmail.com>
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
+
+-- Copyright (C) 2010-2011 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -13,8 +16,6 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE CPP #-}
 module Network.Protocol.XMPP.JID
 	( JID (..)
 	, Node (..)
@@ -25,10 +26,11 @@ module Network.Protocol.XMPP.JID
 	, parseJID_
 	, formatJID
 	) where
+
 import qualified Data.Text.Lazy as TL
 import           Data.Text.Lazy (Text)
 import qualified Data.Text.IDN.StringPrep as SP
-import Data.String (IsString, fromString)
+import           Data.String (IsString, fromString)
 
 newtype Node = Node { strNode :: Text }
 newtype Domain = Domain { strDomain :: Text }

@@ -81,11 +81,13 @@ parseJID str = maybeJID where
 		(x, y) -> if Data.Text.null y
 			then (x, "")
 			else (x, Data.Text.drop 1 y)
-	nullable x f = if Data.Text.null x then Just Nothing else fmap Just $ f x
+	nullable x f = if Data.Text.null x
+		then Just Nothing
+		else fmap Just (f x)
 	maybeJID = do
-		preppedNode <- nullable node $ stringprepM SP.xmppNode
+		preppedNode <- nullable node (stringprepM SP.xmppNode)
 		preppedDomain <- stringprepM SP.nameprep domain
-		preppedResource <- nullable resource $ stringprepM SP.xmppResource
+		preppedResource <- nullable resource (stringprepM SP.xmppResource)
 		return $ JID
 			(fmap Node preppedNode)
 			(Domain preppedDomain)

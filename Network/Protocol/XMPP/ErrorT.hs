@@ -39,8 +39,8 @@ instance Monad m => Monad (ErrorT e m) where
 	(>>=) m k = ErrorT $ do
 		x <- runErrorT m
 		case x of
-			Left l -> return $ Left l
-			Right r -> runErrorT $ k r
+			Left l -> return (Left l)
+			Right r -> runErrorT (k r)
 
 instance Monad m => E.MonadError (ErrorT e m) where
 	type E.ErrorType (ErrorT e m) = e
@@ -48,8 +48,8 @@ instance Monad m => E.MonadError (ErrorT e m) where
 	catchError m h = ErrorT $ do
 		x <- runErrorT m
 		case x of
-			Left l -> runErrorT $ h l
-			Right r -> return $ Right r
+			Left l -> runErrorT (h l)
+			Right r -> return (Right r)
 
 instance MonadTrans (ErrorT e) where
 	lift = ErrorT . liftM Right
@@ -70,4 +70,4 @@ instance MonadFix m => MonadFix (ErrorT e m) where
 mapErrorT :: (m (Either e a) -> n (Either e' b))
            -> ErrorT e m a
            -> ErrorT e' n b
-mapErrorT f m = ErrorT $ f (runErrorT m)
+mapErrorT f m = ErrorT (f (runErrorT m))

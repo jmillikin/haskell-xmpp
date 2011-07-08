@@ -25,7 +25,8 @@ import qualified Control.Exception as Exc
 import           Control.Monad (when, (>=>))
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Control.Monad.Error as E
-import qualified Data.ByteString.Char8 as B
+import           Data.ByteString (ByteString)
+import qualified Data.ByteString.Char8
 import qualified Data.Text
 import           Data.Text (Text)
 import           Data.Text.Encoding (encodeUtf8)
@@ -44,7 +45,7 @@ data AuthException = XmppError M.Error | SaslError Text
 
 instance Exc.Exception AuthException
 
-authenticate :: [B.ByteString] -- ^ Mechanisms
+authenticate :: [ByteString] -- ^ Mechanisms
              -> JID -- ^ User JID
              -> JID -- ^ Server JID
              -> Text -- ^ Username
@@ -52,12 +53,12 @@ authenticate :: [B.ByteString] -- ^ Mechanisms
              -> M.XMPP ()
 authenticate xmppMechanisms userJID serverJID username password = xmpp where
 	mechanisms = map SASL.Mechanism xmppMechanisms
-	authz = formatJID $ userJID { jidResource = Nothing }
+	authz = formatJID (userJID { jidResource = Nothing })
 	hostname = formatJID serverJID
 	
 	xmpp = do
 		ctx <- M.getSession
-		res <- liftIO $ Exc.try $ SASL.runSASL $ do
+		res <- liftIO . Exc.try . SASL.runSASL $ do
 			suggested <- SASL.clientSuggestMechanism mechanisms
 			case suggested of
 				Nothing -> saslError "No supported authentication mechanism"
@@ -66,21 +67,21 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 			Right Success -> return ()
 			Right Failure -> E.throwError M.AuthenticationFailure
 			Left (XmppError err) -> E.throwError err
-			Left (SaslError err) -> E.throwError $ M.AuthenticationError err
+			Left (SaslError err) -> E.throwError (M.AuthenticationError err)
 	
 	authSasl ctx mechanism = do
 		let (SASL.Mechanism mechBytes) = mechanism
 		sessionResult <- SASL.runClient mechanism $ do
-			SASL.setProperty SASL.PropertyAuthzID $ encodeUtf8 authz
-			SASL.setProperty SASL.PropertyAuthID $ encodeUtf8 username
-			SASL.setProperty SASL.PropertyPassword $ encodeUtf8 password
-			SASL.setProperty SASL.PropertyService $ B.pack "xmpp"
-			SASL.setProperty SASL.PropertyHostname $ encodeUtf8 hostname
+			SASL.setProperty SASL.PropertyAuthzID (encodeUtf8 authz)
+			SASL.setProperty SASL.PropertyAuthID (encodeUtf8 username)
+			SASL.setProperty SASL.PropertyPassword (encodeUtf8 password)
+			SASL.setProperty SASL.PropertyService "xmpp"
+			SASL.setProperty SASL.PropertyHostname (encodeUtf8 hostname)
 			
-			(b64text, rc) <- SASL.step64 $ B.pack ""
+			(b64text, rc) <- SASL.step64 ""
 			putElement ctx $ X.element "{urn:ietf:params:xml:ns:xmpp-sasl}auth"
-				[("mechanism", Data.Text.pack $ B.unpack mechBytes)]
-				[X.NodeContent $ X.ContentText $ Data.Text.pack $ B.unpack b64text]
+				[("mechanism", Data.Text.pack (Data.ByteString.Char8.unpack mechBytes))]
+				[X.NodeContent (X.ContentText (Data.Text.pack (Data.ByteString.Char8.unpack b64text)))]
 			
 			case rc of
 				SASL.Complete -> saslFinish ctx
@@ -88,7 +89,7 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 			
 		case sessionResult of
 			Right x -> return x
-			Left err -> saslError $ Data.Text.pack $ show err
+			Left err -> saslError (Data.Text.pack (show err))
 
 saslLoop :: M.Session -> SASL.Session Result
 saslLoop ctx = do
@@ -100,11 +101,11 @@ saslLoop ctx = do
 		>=> X.isContent
 		>=> return . X.contentText
 	let challengeText = getChallengeText elemt
-	when (null challengeText) $ saslError "Received empty challenge"
+	when (null challengeText) (saslError "Received empty challenge")
 	
-	(b64text, rc) <- SASL.step64 . B.pack . concatMap Data.Text.unpack $ challengeText
+	(b64text, rc) <- SASL.step64 (Data.ByteString.Char8.pack (concatMap Data.Text.unpack challengeText))
 	putElement ctx $ X.element "{urn:ietf:params:xml:ns:xmpp-sasl}response"
-		[] [X.NodeContent $ X.ContentText $ Data.Text.pack $ B.unpack b64text]
+		[] [X.NodeContent (X.ContentText (Data.Text.pack (Data.ByteString.Char8.unpack b64text)))]
 	case rc of
 		SASL.Complete -> saslFinish ctx
 		SASL.NeedsMore -> saslLoop ctx
@@ -114,20 +115,20 @@ saslFinish ctx = do
 	elemt <- getElement ctx
 	let name = "{urn:ietf:params:xml:ns:xmpp-sasl}success"
 	let success = X.isNamed name elemt
-	return $ if null success then Failure else Success
+	return (if null success then Failure else Success)
 
 putElement :: M.Session -> X.Element -> SASL.Session ()
 putElement ctx elemt = liftIO $ do
-	res <- M.runXMPP ctx $ M.putElement elemt
+	res <- M.runXMPP ctx (M.putElement elemt)
 	case res of
-		Left err -> Exc.throwIO $ XmppError err
+		Left err -> Exc.throwIO (XmppError err)
 		Right x -> return x
 
 getElement :: M.Session -> SASL.Session X.Element
 getElement ctx = liftIO $ do
 	res <- M.runXMPP ctx M.getElement
 	case res of
-		Left err -> Exc.throwIO $ XmppError err
+		Left err -> Exc.throwIO (XmppError err)
 		Right x -> return x
 
 saslError :: MonadIO m => Text -> m a

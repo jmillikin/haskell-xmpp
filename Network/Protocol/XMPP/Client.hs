@@ -128,7 +128,7 @@ bindStanza resource = (emptyIQ IQSet) { iqPayload = Just payload } where
 	requested = case fmap J.strResource resource of
 		Nothing -> []
 		Just x -> [X.NodeElement $ X.element "resource" []
-			[X.NodeContent $ X.ContentText x]]
+			[X.NodeContent $ X.ContentText (T.toStrict x)]]
 
 sessionStanza :: IQ
 sessionStanza = (emptyIQ IQSet) { iqPayload = Just payload } where

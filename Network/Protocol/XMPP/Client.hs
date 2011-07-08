@@ -24,7 +24,7 @@ import           Control.Monad ((>=>))
 import           Control.Monad.Error (throwError)
 import           Control.Monad.Trans (liftIO)
 import           Data.ByteString (ByteString)
-import qualified Data.Text.Lazy as T
+import           Data.Text (Text)
 import           Network (connectTo)
 import qualified System.IO as IO
 
@@ -40,8 +40,8 @@ import           Network.Protocol.XMPP.Stanza
 
 runClient :: C.Server
           -> J.JID -- ^ Client JID
-          -> T.Text -- ^ Username
-          -> T.Text -- ^ Password
+          -> Text -- ^ Username
+          -> Text -- ^ Password
           -> M.XMPP a
           -> IO (Either M.Error a)
 runClient server jid username password xmpp = do
@@ -130,7 +130,7 @@ bindStanza resource = (emptyIQ IQSet) { iqPayload = Just payload } where
 	requested = case fmap J.strResource resource of
 		Nothing -> []
 		Just x -> [X.NodeElement $ X.element "resource" []
-			[X.NodeContent $ X.ContentText (T.toStrict x)]]
+			[X.NodeContent $ X.ContentText x]]
 
 sessionStanza :: IQ
 sessionStanza = (emptyIQ IQSet) { iqPayload = Just payload } where

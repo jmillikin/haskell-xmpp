@@ -22,13 +22,14 @@ module Network.Protocol.XMPP.Client.Features
 	) where
 
 import           Control.Arrow ((&&&))
-import qualified Data.ByteString.Char8 as B
-import qualified Data.Text.Lazy as TL
+import qualified Data.ByteString.Char8
+import           Data.ByteString (ByteString)
+import qualified Data.Text
 import qualified Network.Protocol.XMPP.XML as X
 
 data Feature =
 	  FeatureStartTLS Bool
-	| FeatureSASL [B.ByteString]
+	| FeatureSASL [ByteString]
 	| FeatureRegister
 	| FeatureBind
 	| FeatureSession
@@ -61,7 +62,7 @@ parseFeatureSASL e = FeatureSASL $
 	>>= X.isNamed nameMechanism
 	>>= X.elementNodes
 	>>= X.isContent
-	>>= return . B.pack . TL.unpack . X.contentText
+	>>= return . Data.ByteString.Char8.pack . Data.Text.unpack . X.contentText
 
 nameMechanism :: X.Name
 nameMechanism = "{urn:ietf:params:xml:ns:xmpp-sasl}mechanism"

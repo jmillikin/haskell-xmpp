@@ -61,8 +61,8 @@ beginStream jid = do
 		Nothing -> throwError M.NoComponentStreamID
 		Just x -> return x
 
-parseStreamID :: X.SaxEvent -> Maybe Text
-parseStreamID (X.BeginElement name attrs) = X.attributeText
+parseStreamID :: X.Event -> Maybe Text
+parseStreamID (X.EventBeginElement name attrs) = X.attributeText
 	"{jabber:component:accept}jid"
 	(X.Element name attrs [])
 parseStreamID _ = Nothing

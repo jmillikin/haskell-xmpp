@@ -157,7 +157,7 @@ putElement = putBytes . encodeUtf8 . X.serialiseElement
 putStanza :: S.Stanza a => a -> XMPP ()
 putStanza = withLock sessionWriteLock . putElement . S.stanzaToElement
 
-readEvents :: (Integer -> X.SaxEvent -> Bool) -> XMPP [X.SaxEvent]
+readEvents :: (Integer -> X.Event -> Bool) -> XMPP [X.Event]
 readEvents done = xmpp where
 	xmpp = do
 		Session h _ p _ _ <- getSession
@@ -179,7 +179,7 @@ getElement = xmpp where
 			Just x -> return x
 			Nothing -> E.throwError $ TransportError "getElement: invalid event list"
 	
-	endOfTree 0 (X.EndElement _) = True
+	endOfTree 0 (X.EventEndElement _) = True
 	endOfTree _ _ = False
 
 getStanza :: XMPP S.ReceivedStanza

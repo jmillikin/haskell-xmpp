@@ -24,6 +24,7 @@ import Data.Bits (shiftR, (.&.))
 import Data.Char (intToDigit)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+import qualified Data.Text
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Encoding as TE
 import Network (connectTo)
@@ -81,7 +82,7 @@ buildSecret :: T.Text -> T.Text -> B.ByteString
 buildSecret sid password = B.concat . BL.toChunks $ bytes where
 	bytes = TE.encodeUtf8 $ X.escape $ T.append sid password
 
-showDigest :: B.ByteString -> T.Text
-showDigest = T.pack . concatMap wordToHex . B.unpack where
+showDigest :: B.ByteString -> Data.Text.Text
+showDigest = Data.Text.pack . concatMap wordToHex . B.unpack where
 	wordToHex x = [hexDig $ shiftR x 4, hexDig $ x .&. 0xF]
 	hexDig = intToDigit . fromIntegral

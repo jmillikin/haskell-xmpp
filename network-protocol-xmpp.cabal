@@ -1,5 +1,5 @@
 name: network-protocol-xmpp
-version: 0.3.3
+version: 0.4
 synopsis: Client->Server XMPP
 license: GPL-3
 license-file: License.txt
@@ -31,8 +31,8 @@ library
     , network >= 2.2 && < 2.4
     , transformers >= 0.2 && < 0.3
     , monads-tf >= 0.1 && < 0.2
-    , libxml-sax >= 0.6 && < 0.7
-    , xml-types >= 0.1 && < 0.2
+    , libxml-sax >= 0.7 && < 0.8
+    , xml-types >= 0.3 && < 0.4
 
   exposed-modules:
     Network.Protocol.XMPP

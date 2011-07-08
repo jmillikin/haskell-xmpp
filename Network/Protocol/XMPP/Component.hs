@@ -1,5 +1,7 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -- Copyright (C) 2010 Stephan Maka <stephan@spaceboyz.net>
--- Copyright (C) 2010 John Millikin <jmillikin@gmail.com>
+-- Copyright (C) 2010-2011 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -14,28 +16,28 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.Component
 	( runComponent
 	) where
-import Control.Monad (when)
-import Control.Monad.Error (throwError)
-import Data.Bits (shiftR, (.&.))
-import Data.Char (intToDigit)
+
+import           Control.Monad (when)
+import           Control.Monad.Error (throwError)
+import           Data.Bits (shiftR, (.&.))
+import           Data.Char (intToDigit)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text
 import qualified Data.Text.Lazy as T
 import qualified Data.Text.Lazy.Encoding as TE
-import Network (connectTo)
-import Network.Protocol.SASL.GNU (sha1)
+import           Network (connectTo)
+import           Network.Protocol.SASL.GNU (sha1)
 import qualified System.IO as IO
 
 import qualified Network.Protocol.XMPP.Connections as C
 import qualified Network.Protocol.XMPP.Handle as H
 import qualified Network.Protocol.XMPP.Monad as M
 import qualified Network.Protocol.XMPP.XML as X
-import Network.Protocol.XMPP.JID (JID)
+import           Network.Protocol.XMPP.JID (JID)
 
 runComponent :: C.Server
              -> T.Text -- ^ Server secret

@@ -1,4 +1,6 @@
--- Copyright (C) 2010 John Millikin <jmillikin@gmail.com>
+{-# LANGUAGE OverloadedStrings #-}
+
+-- Copyright (C) 2010-2011 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -13,7 +15,6 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.XML
 	( Element(..)
 	, Node(..)
@@ -48,12 +49,13 @@ module Network.Protocol.XMPP.XML
 	, eventsToElement
 	
 	) where
-import Control.Monad (when)
+
+import           Control.Monad (when)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Lazy as TL
-import Data.XML.Types as X
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import           Data.XML.Types as X
+import           Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import qualified Text.XML.LibXML.SAX as SAX
 
 getattr :: Name -> Element -> Maybe TL.Text

@@ -1,4 +1,6 @@
--- Copyright (C) 2010 John Millikin <jmillikin@gmail.com>
+{-# LANGUAGE OverloadedStrings #-}
+
+-- Copyright (C) 2010-2011 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -13,17 +15,17 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.Client
 	( runClient
 	, bindJID
 	) where
-import Control.Monad ((>=>))
-import Control.Monad.Error (throwError)
-import Control.Monad.Trans (liftIO)
-import Data.ByteString (ByteString)
+
+import           Control.Monad ((>=>))
+import           Control.Monad.Error (throwError)
+import           Control.Monad.Trans (liftIO)
+import           Data.ByteString (ByteString)
 import qualified Data.Text.Lazy as T
-import Network (connectTo)
+import           Network (connectTo)
 import qualified System.IO as IO
 
 import qualified Network.Protocol.XMPP.Client.Authentication as A
@@ -33,8 +35,8 @@ import qualified Network.Protocol.XMPP.Handle as H
 import qualified Network.Protocol.XMPP.JID as J
 import qualified Network.Protocol.XMPP.Monad as M
 import qualified Network.Protocol.XMPP.XML as X
-import Network.Protocol.XMPP.ErrorT
-import Network.Protocol.XMPP.Stanza
+import           Network.Protocol.XMPP.ErrorT
+import           Network.Protocol.XMPP.Stanza
 
 runClient :: C.Server
           -> J.JID -- ^ Client JID

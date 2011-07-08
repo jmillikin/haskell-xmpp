@@ -1,4 +1,6 @@
--- Copyright (C) 2010 John Millikin <jmillikin@gmail.com>
+{-# LANGUAGE TypeFamilies #-}
+
+-- Copyright (C) 2010-2011 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -13,16 +15,15 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE TypeFamilies #-}
 module Network.Protocol.XMPP.ErrorT
 	( ErrorT (..)
 	, mapErrorT
 	) where
 
-import Control.Monad (liftM)
-import Control.Monad.Fix (MonadFix, mfix)
-import Control.Monad.Trans (MonadIO, liftIO)
-import Control.Monad.Trans.Class (MonadTrans, lift)
+import           Control.Monad (liftM)
+import           Control.Monad.Fix (MonadFix, mfix)
+import           Control.Monad.Trans (MonadIO, liftIO)
+import           Control.Monad.Trans.Class (MonadTrans, lift)
 import qualified Control.Monad.Error as E
 import qualified Control.Monad.Reader as R
 

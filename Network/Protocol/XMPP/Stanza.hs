@@ -1,4 +1,6 @@
--- Copyright (C) 2010 John Millikin <jmillikin@gmail.com>
+{-# LANGUAGE OverloadedStrings #-}
+
+-- Copyright (C) 2010-2011 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -13,7 +15,6 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.Stanza
 	( Stanza (..)
 	
@@ -32,10 +33,10 @@ module Network.Protocol.XMPP.Stanza
 	, elementToStanza
 	) where
 
-import Control.Monad (when)
+import           Control.Monad (when)
 import qualified Data.Text.Lazy as T
 import qualified Network.Protocol.XMPP.XML as X
-import Network.Protocol.XMPP.JID (JID, parseJID, formatJID)
+import           Network.Protocol.XMPP.JID (JID, parseJID, formatJID)
 
 class Stanza a where
 	stanzaTo        :: a -> Maybe JID

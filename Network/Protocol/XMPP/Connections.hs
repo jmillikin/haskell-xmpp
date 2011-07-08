@@ -1,4 +1,6 @@
--- Copyright (C) 2010 John Millikin <jmillikin@gmail.com>
+{-# LANGUAGE OverloadedStrings #-}
+
+-- Copyright (C) 2010-2011 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -13,20 +15,20 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.Connections
 	( Server (..)
 	, xmlHeader
 	, startOfStream
 	, qnameStream
 	) where
-import Network (HostName, PortID)
+
+import           Network (HostName, PortID)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.Text.Lazy as T
-import Data.Text.Lazy.Encoding (encodeUtf8)
+import           Data.Text.Lazy.Encoding (encodeUtf8)
 
 import qualified Network.Protocol.XMPP.XML as X
-import Network.Protocol.XMPP.JID (JID, formatJID)
+import           Network.Protocol.XMPP.JID (JID, formatJID)
 
 data Server = Server
 	{ serverJID      :: JID

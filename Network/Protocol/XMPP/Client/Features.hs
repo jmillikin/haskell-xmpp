@@ -1,4 +1,6 @@
--- Copyright (C) 2010 John Millikin <jmillikin@gmail.com>
+{-# LANGUAGE OverloadedStrings #-}
+
+-- Copyright (C) 2010-2011 John Millikin <jmillikin@gmail.com>
 -- 
 -- This program is free software: you can redistribute it and/or modify
 -- it under the terms of the GNU General Public License as published by
@@ -13,13 +15,13 @@
 -- You should have received a copy of the GNU General Public License
 -- along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE OverloadedStrings #-}
 module Network.Protocol.XMPP.Client.Features
 	( Feature (..)
 	, parseFeatures
 	, parseFeature
 	) where
-import Control.Arrow ((&&&))
+
+import           Control.Arrow ((&&&))
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Text.Lazy as TL
 import qualified Network.Protocol.XMPP.XML as X

@@ -51,9 +51,9 @@ xmlHeader ns jid = encodeUtf8 header where
 		, " xmlns:stream=\"http://etherx.jabber.org/streams\">"
 		]
 
-startOfStream :: Integer -> X.SaxEvent -> Bool
+startOfStream :: Integer -> X.Event -> Bool
 startOfStream depth event = case (depth, event) of
-	(1, (X.BeginElement elemName _)) -> qnameStream == elemName
+	(1, (X.EventBeginElement elemName _)) -> qnameStream == elemName
 	_ -> False
 
 qnameStream :: X.Name

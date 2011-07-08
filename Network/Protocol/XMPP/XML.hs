@@ -29,7 +29,6 @@ module Network.Protocol.XMPP.XML
 	
 	-- * libxml-sax-0.4 API imitation
 	, Parser
-	, SaxEvent (..)
 	, newParser
 	, parse
 	, eventsToElement
@@ -91,7 +90,7 @@ serialiseElement e = text where
 
 -- quick-and-dirty imitation of libxml-sax-0.4 API; later, this should
 -- probably be rewritten to use ST and discard the list parsing
-data Parser = Parser (SAX.Parser IO) (IORef (Either Text [SaxEvent]))
+data Parser = Parser (SAX.Parser IO) (IORef (Either Text [Event]))
 
 newParser :: IO Parser
 newParser = do
@@ -105,16 +104,16 @@ newParser = do
 			Right es -> writeIORef ref (Right (e:es))
 		return True
 	
-	SAX.setCallback p SAX.parsedBeginElement (\name' attrs -> addEvent $ BeginElement name' attrs)
-	SAX.setCallback p SAX.parsedEndElement (\name' -> addEvent $ EndElement name')
-	SAX.setCallback p SAX.parsedCharacters (\txt -> addEvent $ Characters txt)
-	SAX.setCallback p SAX.parsedComment (\txt -> addEvent $ Comment txt)
-	SAX.setCallback p SAX.parsedInstruction (\i -> addEvent $ ProcessingInstruction i)
+	SAX.setCallback p SAX.parsedBeginElement (\name attrs -> addEvent (EventBeginElement name attrs))
+	SAX.setCallback p SAX.parsedEndElement (\name -> addEvent (EventEndElement name))
+	SAX.setCallback p SAX.parsedCharacters (\txt -> addEvent (EventContent (ContentText txt)))
+	SAX.setCallback p SAX.parsedComment (\txt -> addEvent (EventComment txt))
+	SAX.setCallback p SAX.parsedInstruction (\i -> addEvent (EventInstruction i))
 	SAX.setCallback p SAX.reportError (\err -> writeIORef ref (Left err) >> return False)
 	
 	return $ Parser p ref
 
-parse :: Parser -> ByteString -> Bool -> IO (Either Text [SaxEvent])
+parse :: Parser -> ByteString -> Bool -> IO (Either Text [Event])
 parse (Parser p ref) bytes finish = do
 	writeIORef ref (Right [])
 	SAX.parseBytes p bytes
@@ -124,17 +123,10 @@ parse (Parser p ref) bytes finish = do
 		Left err -> Left err
 		Right events -> Right $ reverse events
 
-data SaxEvent
-	= BeginElement Name [(Name, [Content])]
-	| EndElement Name
-	| Characters Text
-	| Comment Text
-	| ProcessingInstruction Instruction
-
 readEvents :: Monad m
-           => (Integer -> SaxEvent -> Bool)
-           -> m [SaxEvent]
-           -> m [SaxEvent]
+           => (Integer -> Event -> Bool)
+           -> m [Event]
+           -> m [Event]
 readEvents done nextEvents = readEvents' 0 [] where
 	readEvents' depth acc = do
 		events <- nextEvents
@@ -146,8 +138,8 @@ readEvents done nextEvents = readEvents' 0 [] where
 	step [] depth acc = (False, depth, acc)
 	step (e:es) depth acc = let
 		depth' = depth + case e of
-			(BeginElement _ _) -> 1
-			(EndElement _) -> (- 1)
+			(EventBeginElement _ _) -> 1
+			(EventEndElement _) -> (- 1)
 			_ -> 0
 		acc' = e : acc
 		in if done depth' e
@@ -156,18 +148,18 @@ readEvents done nextEvents = readEvents' 0 [] where
 
 -- | Convert a list of events to a single 'Element'. If the events do not
 -- contain at least one valid element, 'Nothing' will be returned instead.
-eventsToElement :: [SaxEvent] -> Maybe Element
+eventsToElement :: [Event] -> Maybe Element
 eventsToElement es = case eventsToNodes es >>= isElement of
 	(e:_) -> Just e
 	_ -> Nothing
 
-eventsToNodes :: [SaxEvent] -> [Node]
+eventsToNodes :: [Event] -> [Node]
 eventsToNodes = concatMap blockToNodes . splitBlocks
 
 -- Split event list into a sequence of "blocks", which are the events including
 -- and between a pair of tags. <start><start2/></start> and <start/> are both
 -- single blocks.
-splitBlocks :: [SaxEvent] -> [[SaxEvent]]
+splitBlocks :: [Event] -> [[Event]]
 splitBlocks es = ret where
 	(_, _, ret) = foldl splitBlocks' (0, [], []) es
 	
@@ -178,17 +170,17 @@ splitBlocks es = ret where
 		accum' = accum ++ [e]
 		depth' :: Integer
 		depth' = depth + case e of
-			(BeginElement _ _) -> 1
-			(EndElement _) -> (- 1)
+			(EventBeginElement _ _) -> 1
+			(EventEndElement _) -> (- 1)
 			_ -> 0
 
-blockToNodes :: [SaxEvent] -> [Node]
+blockToNodes :: [Event] -> [Node]
 blockToNodes [] = []
 blockToNodes (begin:rest) = nodes where
 	end = last rest
 	nodes = case (begin, end) of
-		(BeginElement name' attrs, EndElement _) -> [node name' attrs]
-		(Characters t, _) -> [NodeContent (ContentText t)]
+		(EventBeginElement name attrs, EventEndElement _) -> [node name attrs]
+		(EventContent c, _) -> [NodeContent c]
 		_ -> []
 	
 	node n as = NodeElement $ Element n as $ eventsToNodes $ init rest

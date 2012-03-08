@@ -42,6 +42,7 @@ import           Control.Monad (ap)
 import           Control.Monad.Fix (MonadFix, mfix)
 import           Control.Monad.Trans (MonadIO, liftIO)
 import qualified Control.Monad.Error as E
+import           Control.Monad.Error (ErrorType)
 import qualified Control.Monad.Reader as R
 import qualified Data.ByteString
 import           Data.ByteString (ByteString)
@@ -96,7 +97,7 @@ instance MonadIO XMPP where
 	liftIO = XMPP . liftIO
 
 instance E.MonadError XMPP where
-	type E.ErrorType XMPP = Error
+	type ErrorType XMPP = Error
 	throwError = XMPP . E.throwError
 	catchError m h = XMPP (E.catchError (unXMPP m) (unXMPP . h))
 

@@ -25,7 +25,9 @@ import           Control.Monad.Fix (MonadFix, mfix)
 import           Control.Monad.Trans (MonadIO, liftIO)
 import           Control.Monad.Trans.Class (MonadTrans, lift)
 import qualified Control.Monad.Error as E
+import           Control.Monad.Error (ErrorType)
 import qualified Control.Monad.Reader as R
+import           Control.Monad.Reader (EnvType)
 
 -- A custom version of ErrorT, without the 'Error' class restriction.
 
@@ -43,7 +45,7 @@ instance Monad m => Monad (ErrorT e m) where
 			Right r -> runErrorT (k r)
 
 instance Monad m => E.MonadError (ErrorT e m) where
-	type E.ErrorType (ErrorT e m) = e
+	type ErrorType (ErrorT e m) = e
 	throwError = ErrorT . return . Left
 	catchError m h = ErrorT $ do
 		x <- runErrorT m
@@ -55,7 +57,7 @@ instance MonadTrans (ErrorT e) where
 	lift = ErrorT . liftM Right
 
 instance R.MonadReader m => R.MonadReader (ErrorT e m) where
-	type R.EnvType (ErrorT e m) = R.EnvType m
+	type EnvType (ErrorT e m) = EnvType m
 	ask = lift R.ask
 	local = mapErrorT . R.local
 

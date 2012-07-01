@@ -33,7 +33,7 @@ import Data.XML.Types
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.IO.Class
-import qualified Data.Text.Lazy as T
+import qualified Data.Text as T
 import System.Environment
 
 runEcho :: String -> T.Text -> T.Text -> IO ()

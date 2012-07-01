@@ -22,7 +22,7 @@ module Network.Protocol.XMPP.Client.Authentication
 	) where
 
 import qualified Control.Exception as Exc
-import           Control.Monad (when, (>=>))
+import           Control.Monad (when)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import qualified Control.Monad.Error as E
 import           Data.ByteString (ByteString)
@@ -89,33 +89,46 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 			
 		case sessionResult of
 			Right x -> return x
-			Left err -> saslError (Data.Text.pack (show err))
+			Left err -> saslError (show err)
 
 saslLoop :: M.Session -> SASL.Session Result
 saslLoop ctx = do
-	elemt <- getElement ctx
-	let name = "{urn:ietf:params:xml:ns:xmpp-sasl}challenge"
-	let getChallengeText =
-		X.isNamed name
-		>=> X.elementNodes
-		>=> X.isContent
-		>=> return . X.contentText
-	let challengeText = getChallengeText elemt
-	when (null challengeText) (saslError "Received empty challenge")
-	
-	(b64text, rc) <- SASL.step64 (Data.ByteString.Char8.pack (concatMap Data.Text.unpack challengeText))
-	putElement ctx $ X.element "{urn:ietf:params:xml:ns:xmpp-sasl}response"
-		[] [X.NodeContent (X.ContentText (Data.Text.pack (Data.ByteString.Char8.unpack b64text)))]
-	case rc of
-		SASL.Complete -> saslFinish ctx
-		SASL.NeedsMore -> saslLoop ctx
+	e <- getElement ctx
+	let challengeTexts = X.elementNodes e >>= X.isContent >>= return . X.contentText
+	let challenge = concatMap Data.Text.unpack challengeTexts
+	case X.elementName e of
+		-- The server needs more data before it can authenticate this client.
+		n | n == "{urn:ietf:params:xml:ns:xmpp-sasl}challenge" -> do
+			when (null challenge) (saslError "Received empty challenge")
+			(b64text, rc) <- SASL.step64 (Data.ByteString.Char8.pack challenge)
+			putElement ctx (X.element
+				"{urn:ietf:params:xml:ns:xmpp-sasl}response"
+				[]
+				[X.NodeContent (X.ContentText (Data.Text.pack (Data.ByteString.Char8.unpack b64text)))])
+			case rc of
+				SASL.Complete -> saslFinish ctx
+				SASL.NeedsMore -> saslLoop ctx
+		
+		-- The server has authenticated this client, but the client-side
+		-- SASL protocol wants more data from the server.
+		n | n == "{urn:ietf:params:xml:ns:xmpp-sasl}success" -> do
+			when (null challenge) (saslError "Received empty challenge")
+			(_, rc) <- SASL.step64 (Data.ByteString.Char8.pack challenge)
+			case rc of
+				SASL.Complete -> return Success
+				SASL.NeedsMore -> saslError "Server didn't provide enough SASL data."
+		
+		-- The server has rejected this client's credentials.
+		n | n == "{urn:ietf:params:xml:ns:xmpp-sasl}failure" -> return Failure
+		
+		_ -> saslError ("Server sent unexpected element during authentication.")
 
 saslFinish :: M.Session -> SASL.Session Result
 saslFinish ctx = do
 	elemt <- getElement ctx
-	let name = "{urn:ietf:params:xml:ns:xmpp-sasl}success"
-	let success = X.isNamed name elemt
-	return (if null success then Failure else Success)
+	return $ if X.elementName elemt == "{urn:ietf:params:xml:ns:xmpp-sasl}success"
+		then Success
+		else Failure
 
 putElement :: M.Session -> X.Element -> SASL.Session ()
 putElement ctx elemt = liftIO $ do
@@ -131,5 +144,5 @@ getElement ctx = liftIO $ do
 		Left err -> Exc.throwIO (XmppError err)
 		Right x -> return x
 
-saslError :: MonadIO m => Text -> m a
-saslError = liftIO . Exc.throwIO . SaslError
+saslError :: MonadIO m => String -> m a
+saslError = liftIO . Exc.throwIO . SaslError . Data.Text.pack

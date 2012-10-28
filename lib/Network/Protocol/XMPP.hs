@@ -62,6 +62,7 @@ module Network.Protocol.XMPP
 	-- ** Resuming sessions
 	, Session
 	, getSession
+	, sessionIsSecure
 	, runXMPP
 	) where
 

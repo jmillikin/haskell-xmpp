@@ -20,6 +20,7 @@ module Network.Protocol.XMPP.Handle
 	, startTLS
 	, hPutBytes
 	, hGetBytes
+	, handleIsSecure
 	) where
 
 import           Control.Monad (when)
@@ -69,3 +70,7 @@ hGetBytes (SecureHandle h s) n = liftTLS s $ do
 	when (pending == 0) (liftIO wait)
 	lazy <- TLS.getBytes n
 	return (Data.ByteString.concat (Data.ByteString.Lazy.toChunks lazy))
+
+handleIsSecure :: Handle -> Bool
+handleIsSecure PlainHandle{} = False
+handleIsSecure SecureHandle{} = True

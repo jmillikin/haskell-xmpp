@@ -26,6 +26,7 @@ module Network.Protocol.XMPP.Monad
 	
 	, getHandle
 	, getSession
+	, sessionIsSecure
 	
 	, readEvents
 	, getElement
@@ -139,6 +140,11 @@ getSession = XMPP R.ask
 
 getHandle :: XMPP H.Handle
 getHandle = fmap sessionHandle getSession
+
+sessionIsSecure :: XMPP Bool
+sessionIsSecure = do
+	h <- getHandle
+	return (H.handleIsSecure h)
 
 liftTLS :: ErrorT Text IO a -> XMPP a
 liftTLS io = do

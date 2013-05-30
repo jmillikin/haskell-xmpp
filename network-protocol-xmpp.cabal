@@ -1,5 +1,5 @@
 name: network-protocol-xmpp
-version: 0.4.4
+version: 0.4.5
 license: GPL-3
 license-file: license.txt
 author: John Millikin <jmillikin@gmail.com>, Stephan Maka <stephan@spaceboyz.net>
@@ -15,13 +15,13 @@ synopsis: Client library for the XMPP protocol.
 description:
 
 source-repository head
-  type: bazaar
-  location: https://john-millikin.com/branches/network-protocol-xmpp/0.4/
+  type: git
+  location: https://john-millikin.com/code/haskell-xmpp/
 
 source-repository this
-  type: bazaar
-  location: https://john-millikin.com/branches/network-protocol-xmpp/0.4/
-  tag: network-protocol-xmpp_0.4.4
+  type: git
+  location: https://john-millikin.com/code/haskell-xmpp/
+  tag: network-protocol-xmpp_0.4.5
 
 library
   ghc-options: -Wall -O2

@@ -57,7 +57,11 @@ import qualified Network.Protocol.XMPP.XML as X
 
 data Error
 	-- | The remote host refused the specified authentication credentials.
-	= AuthenticationFailure
+	--
+	-- The included XML element is the error value that the server
+	-- provided. It may contain additional information about why
+	-- authentication failed.
+	= AuthenticationFailure X.Element
 	
 	-- | There was an error while authenticating with the remote host.
 	| AuthenticationError Text

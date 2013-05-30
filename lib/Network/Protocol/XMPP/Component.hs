@@ -74,7 +74,7 @@ authenticate streamID password = do
 	M.putElement (X.element "handshake" [] [X.NodeContent (X.ContentText digest)])
 	result <- M.getElement
 	let nameHandshake = "{jabber:component:accept}handshake"
-	when (null (X.isNamed nameHandshake result)) (throwError M.AuthenticationFailure)
+	when (null (X.isNamed nameHandshake result)) (throwError (M.AuthenticationFailure result))
 
 buildSecret :: Text -> Text -> ByteString
 buildSecret sid password = encodeUtf8 (X.escape (Data.Text.append sid password))

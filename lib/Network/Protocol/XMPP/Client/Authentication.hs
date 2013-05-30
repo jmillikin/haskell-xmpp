@@ -37,7 +37,7 @@ import qualified Network.Protocol.XMPP.Monad as M
 import qualified Network.Protocol.XMPP.XML as X
 import           Network.Protocol.XMPP.JID (JID, formatJID, jidResource)
 
-data Result = Success | Failure
+data Result = Success | Failure X.Element
 	deriving (Show, Eq)
 
 data AuthException = XmppError M.Error | SaslError Text
@@ -65,7 +65,7 @@ authenticate xmppMechanisms userJID serverJID username password = xmpp where
 				Just mechanism -> authSasl ctx mechanism
 		case res of
 			Right Success -> return ()
-			Right Failure -> E.throwError M.AuthenticationFailure
+			Right (Failure e) -> E.throwError (M.AuthenticationFailure e)
 			Left (XmppError err) -> E.throwError err
 			Left (SaslError err) -> E.throwError (M.AuthenticationError err)
 	
@@ -119,7 +119,7 @@ saslLoop ctx = do
 				SASL.NeedsMore -> saslError "Server didn't provide enough SASL data."
 		
 		-- The server has rejected this client's credentials.
-		n | n == "{urn:ietf:params:xml:ns:xmpp-sasl}failure" -> return Failure
+		n | n == "{urn:ietf:params:xml:ns:xmpp-sasl}failure" -> return (Failure e)
 		
 		_ -> saslError ("Server sent unexpected element during authentication.")
 
@@ -128,7 +128,7 @@ saslFinish ctx = do
 	elemt <- getElement ctx
 	return $ if X.elementName elemt == "{urn:ietf:params:xml:ns:xmpp-sasl}success"
 		then Success
-		else Failure
+		else Failure elemt
 
 putElement :: M.Session -> X.Element -> SASL.Session ()
 putElement ctx elemt = liftIO $ do

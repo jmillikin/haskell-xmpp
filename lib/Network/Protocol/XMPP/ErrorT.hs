@@ -20,6 +20,7 @@ module Network.Protocol.XMPP.ErrorT
 	, mapErrorT
 	) where
 
+import           Control.Applicative (Applicative, pure, (<*>))
 import           Control.Monad (liftM)
 import           Control.Monad.Fix (MonadFix, mfix)
 import           Control.Monad.Trans (MonadIO, liftIO)
@@ -35,6 +36,18 @@ newtype ErrorT e m a = ErrorT { runErrorT :: m (Either e a) }
 
 instance Functor m => Functor (ErrorT e m) where
 	fmap f = ErrorT . fmap (fmap f) . runErrorT
+
+instance (Functor m, Monad m) => Applicative (ErrorT e m) where
+	pure a  = ErrorT $ return (Right a)
+	f <*> v = ErrorT $ do
+		mf <- runErrorT f
+		case mf of
+			Left  e -> return (Left e)
+			Right k -> do
+				mv <- runErrorT v
+				case mv of
+					Left  e -> return (Left e)
+					Right x -> return (Right (k x))
 
 instance Monad m => Monad (ErrorT e m) where
 	return = ErrorT . return . Right
